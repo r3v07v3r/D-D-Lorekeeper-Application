@@ -1,0 +1,54 @@
+{
+  "name": "lorekeeper-electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lorekeeper desktop shell: spawns the bundled Python backend and loads the React dashboard.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "build": {
+    "appId": "com.lorekeeper.app",
+    "productName": "Lorekeeper",
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist",
+        "to": "frontend"
+      },
+      {
+        "from": "../backend/dist",
+        "to": "backend",
+        "filter": ["lorekeeper-backend*"]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "REPLACE_WITH_GITHUB_OWNER",
+        "repo": "REPLACE_WITH_GITHUB_REPO"
+      }
+    ]
+  }
+}

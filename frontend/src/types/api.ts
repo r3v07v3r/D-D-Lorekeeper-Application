@@ -1,0 +1,78 @@
+// Mirrors backend/app/schemas.py and the response models in
+// backend/app/routers/*.py. Kept as plain interfaces (no runtime validation)
+// since this is a trusted, single-machine local backend we control.
+
+export type Role = 'gm' | 'player'
+
+export interface UserPublic {
+  id: number
+  username: string
+  role: Role
+  discord_id: string | null
+  dnd_beyond_character_id: string | null
+}
+
+export interface LoginResponse {
+  token: string
+  user: UserPublic
+}
+
+export interface SessionLogPublic {
+  id: number
+  campaign_name: string
+  session_number: number
+  date: string
+  full_transcript: string | null
+  gm_summary: string | null
+  player_summary: string | null
+  processing_status: 'pending' | 'processing' | 'complete' | 'error'
+  processing_error: string | null
+}
+
+export interface NotePublic {
+  id: number
+  session_id: number
+  author_id: number
+  content: string
+  is_private_gm: boolean
+  target_player_id: number | null
+}
+
+export interface InventoryItemPublic {
+  name: string
+  quantity: number
+  equipped: boolean
+}
+
+export interface CharacterPublic {
+  character_id: string
+  name: string
+  race: string
+  classes: string[]
+  level: number
+  proficiency_bonus: number
+  ability_scores: Record<string, number>
+  ability_modifiers: Record<string, number>
+  hp_current: number
+  hp_max: number
+  hp_temp: number
+  armor_class: number
+  armor_class_is_estimate: boolean
+  passive_perception: number
+  passive_perception_is_estimate: boolean
+  currencies: Record<string, number>
+  inventory: InventoryItemPublic[]
+}
+
+export interface PartyMemberPublic {
+  user_id: number
+  username: string
+  character: CharacterPublic | null
+  sync_error: string | null
+}
+
+export interface BotStatusResponse {
+  connected: boolean
+  is_recording: boolean
+  current_session_log_id: number | null
+}

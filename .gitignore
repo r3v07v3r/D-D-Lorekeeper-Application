@@ -1,0 +1,27 @@
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime data
+backend/*.db
+recordings/
+backend/recordings/
+
+# Env files
+.env
+backend/.env
+frontend/.env.local
+
+# PyInstaller build output
+backend/build_tmp/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+
+# Electron packaging output
+release/
+

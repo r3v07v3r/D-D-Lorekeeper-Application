@@ -1,0 +1,3 @@
+# Build-only dependency, not needed at runtime - kept separate from
+# requirements.txt so the app's actual runtime dependency set stays minimal.
+pyinstaller==6.21.0
