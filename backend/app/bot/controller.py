@@ -10,6 +10,7 @@ import discord
 
 from app.bot.recorder import VoiceRecorder
 from app.config import Settings
+from app.runtime_config import RuntimeConfigStore
 from app.state import BotState
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ async def leave_channel(bot_state: BotState) -> None:
         bot_state.reset_voice()
 
 
-async def start_recording(bot_state: BotState, session_log_id: int, settings: Settings) -> None:
+async def start_recording(bot_state: BotState, session_log_id: int, settings: Settings | RuntimeConfigStore) -> None:
     if bot_state.voice_client is None or not bot_state.voice_client.is_connected():
         raise VoiceControlError("Join a voice channel before starting a recording.")
     if bot_state.is_recording:

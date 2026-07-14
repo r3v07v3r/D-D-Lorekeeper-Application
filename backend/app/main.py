@@ -4,18 +4,20 @@ Wires up the database, session store, and the Discord bot (as a background
 asyncio task sharing this process's event loop, per the project's
 single-process desktop architecture) then mounts all routers.
 """
-import asyncio
 import logging
+import os
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import SessionStore
-from app.bot.client import create_bot
+from app.bot.client import ensure_bot_running
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
 from app.dndbeyond.sync import CharacterSyncState
-from app.routers import auth, bot_control, characters, notes, sessions, users
+from app.routers import auth, bot_control, characters, notes, sessions, settings as settings_router, users
+from app.runtime_config import RuntimeConfigStore
 from app.state import BotState
 
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +43,7 @@ app.include_router(sessions.router)
 app.include_router(notes.router)
 app.include_router(bot_control.router)
 app.include_router(characters.router)
+app.include_router(settings_router.router)
 
 
 @app.on_event("startup")
@@ -54,17 +57,21 @@ async def on_startup() -> None:
     bot_state = BotState()
     app.state.bot_state = bot_state
 
-    if settings.discord_bot_token:
-        bot = create_bot(bot_state)
-        bot_state.bot = bot
-        app.state.bot_task = asyncio.create_task(bot.start(settings.discord_bot_token))
-    else:
-        logger.warning("DISCORD_BOT_TOKEN not set - running API-only, the Discord bot will not start")
-        app.state.bot_task = None
+    # Electron points this at app.getPath('userData') so a GM's saved
+    # settings (Discord token, OpenAI key, etc. - see app/runtime_config.py)
+    # survive app reinstalls/updates. Defaults to the working directory for
+    # local/dev use.
+    config_dir = Path(os.environ.get("LOREKEEPER_CONFIG_DIR", "."))
+    runtime_config = RuntimeConfigStore(config_dir, base=settings)
+    app.state.runtime_config = runtime_config
+
+    if not runtime_config.discord_bot_token:
+        logger.warning("No Discord bot token configured yet - running API-only until one is set via Settings")
+    await ensure_bot_running(bot_state, runtime_config.discord_bot_token)
 
     dndbeyond_sync = CharacterSyncState()
     app.state.dndbeyond_sync = dndbeyond_sync
-    dndbeyond_sync.start_background_sync(SessionLocal, settings.dndbeyond_sync_interval_minutes)
+    dndbeyond_sync.start_background_sync(SessionLocal, runtime_config.dndbeyond_sync_interval_minutes)
 
 
 @app.on_event("shutdown")
@@ -72,9 +79,8 @@ async def on_shutdown() -> None:
     bot_state: BotState = app.state.bot_state
     if bot_state.bot is not None:
         await bot_state.bot.close()
-    bot_task = getattr(app.state, "bot_task", None)
-    if bot_task is not None:
-        bot_task.cancel()
+    if bot_state.bot_task is not None:
+        bot_state.bot_task.cancel()
 
     app.state.dndbeyond_sync.stop_background_sync()
 

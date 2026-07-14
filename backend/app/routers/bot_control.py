@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.auth import SessionRecord, require_gm
 from app.bot import controller
-from app.config import get_settings
 from app.database import get_db
 from app.models import SessionLog
+from app.runtime_config import RuntimeConfigStore, get_runtime_config
 from app.state import BotState
 
 router = APIRouter(prefix="/bot", tags=["bot-control"])
@@ -80,12 +80,16 @@ async def record_start(
     payload: RecordStartRequest,
     db: Session = Depends(get_db),
     bot_state: BotState = Depends(get_bot_state),
+    runtime_config: RuntimeConfigStore = Depends(get_runtime_config),
     _current: SessionRecord = Depends(require_gm),
 ) -> None:
     if db.get(SessionLog, payload.session_log_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such session log")
     try:
-        await controller.start_recording(bot_state, payload.session_log_id, get_settings())
+        # RuntimeConfigStore duck-types Settings for the fields controller
+        # needs (audio_storage_dir falls through to the base env settings,
+        # recording_chunk_minutes uses the GM's saved override if any).
+        await controller.start_recording(bot_state, payload.session_log_id, runtime_config)
     except controller.VoiceControlError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 

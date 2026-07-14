@@ -8,6 +8,8 @@ import type {
   NotePublic,
   PartyMemberPublic,
   SessionLogPublic,
+  SettingsPublic,
+  SettingsUpdate,
   UserPublic,
 } from '../types/api'
 
@@ -46,3 +48,7 @@ export const leaveVoiceChannel = (token: string) => api.post<void>('/bot/leave',
 export const startRecording = (token: string, sessionLogId: number) =>
   api.post<void>('/bot/record/start', { session_log_id: sessionLogId }, token)
 export const stopRecording = (token: string) => api.post<void>('/bot/record/stop', undefined, token)
+
+export const getSettings = (token: string) => api.get<SettingsPublic>('/settings', token)
+export const updateSettings = (token: string, payload: SettingsUpdate) =>
+  api.put<SettingsPublic>('/settings', payload, token)

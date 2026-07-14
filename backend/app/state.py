@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 @dataclass
 class BotState:
     bot: object | None = None  # the running discord.Bot instance, set at startup
+    bot_task: object | None = None  # asyncio.Task running bot.start(), set alongside `bot`
     voice_client: object | None = None  # discord.VoiceClient, set once connected
     current_session_log_id: int | None = None
     recorder: object | None = None  # app.bot.recorder.VoiceRecorder, set once recording starts

@@ -85,3 +85,28 @@ class NotePublic(BaseModel):
     content: str
     is_private_gm: bool
     target_player_id: int | None = None
+
+
+# ---- Settings ----
+
+class SettingsUpdate(BaseModel):
+    """All fields optional - PUT /settings only changes what's provided.
+    Secrets are write-only: there is no way to read a previously-saved
+    token/key back out (see SettingsPublic), only to overwrite it.
+    """
+    discord_bot_token: str | None = None
+    openai_api_key: str | None = None
+    whisper_model: str | None = None
+    summarization_model: str | None = None
+    recording_chunk_minutes: int | None = None
+    dndbeyond_sync_interval_minutes: int | None = None
+
+
+class SettingsPublic(BaseModel):
+    discord_bot_token_set: bool
+    openai_api_key_set: bool
+    whisper_model: str
+    summarization_model: str
+    recording_chunk_minutes: int
+    dndbeyond_sync_interval_minutes: int
+    bot_running: bool

@@ -76,3 +76,22 @@ export interface BotStatusResponse {
   is_recording: boolean
   current_session_log_id: number | null
 }
+
+export interface SettingsPublic {
+  discord_bot_token_set: boolean
+  openai_api_key_set: boolean
+  whisper_model: string
+  summarization_model: string
+  recording_chunk_minutes: number
+  dndbeyond_sync_interval_minutes: number
+  bot_running: boolean
+}
+
+export interface SettingsUpdate {
+  discord_bot_token?: string
+  openai_api_key?: string
+  whisper_model?: string
+  summarization_model?: string
+  recording_chunk_minutes?: number
+  dndbeyond_sync_interval_minutes?: number
+}

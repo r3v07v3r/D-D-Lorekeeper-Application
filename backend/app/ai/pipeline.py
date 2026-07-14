@@ -13,11 +13,12 @@ from app.ai.transcript_builder import build_session_transcript
 from app.config import Settings
 from app.database import SessionLocal
 from app.models import SessionLog
+from app.runtime_config import RuntimeConfigStore
 
 logger = logging.getLogger(__name__)
 
 
-def process_session(session_log_id: int, settings: Settings) -> None:
+def process_session(session_log_id: int, settings: Settings | RuntimeConfigStore) -> None:
     """Synchronous entrypoint suitable for BackgroundTasks/a thread - opens
     its own DB session since it may run after the request's session has
     already closed.

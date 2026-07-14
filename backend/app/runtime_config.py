@@ -1,0 +1,88 @@
+"""Persisted, GM-editable settings that layer on top of the env-based
+Settings (app/config.py).
+
+Why this exists: a packaged, single-file Electron build has no editable
+.env sitting next to it, so there needs to be an in-app way for the GM to
+enter a Discord bot token and OpenAI API key without touching a text file.
+Env vars / .env remain the mechanism for developer/advanced use and for
+settings that aren't safe to flip at runtime (DATABASE_URL, AUDIO_STORAGE_DIR,
+CORS_ORIGINS); this store only covers the fields a GM should reasonably be
+able to change from a Settings screen.
+
+Persistence location: a JSON file under `config_dir`, which Electron points
+at `app.getPath('userData')` (a stable per-user directory that survives
+app reinstalls/updates) - see electron/main.js. In dev, it defaults to the
+backend's own working directory.
+"""
+import json
+import logging
+from pathlib import Path
+from threading import Lock
+
+from fastapi import Request
+
+from app.config import Settings, get_settings
+
+logger = logging.getLogger(__name__)
+
+# The only fields editable via the Settings API/UI - deliberately a subset
+# of Settings, not all of it (see module docstring for why).
+EDITABLE_FIELDS = (
+    "discord_bot_token",
+    "openai_api_key",
+    "whisper_model",
+    "summarization_model",
+    "recording_chunk_minutes",
+    "dndbeyond_sync_interval_minutes",
+)
+
+# Fields containing secrets - never echoed back verbatim by the API.
+SECRET_FIELDS = ("discord_bot_token", "openai_api_key")
+
+
+class RuntimeConfigStore:
+    def __init__(self, config_dir: Path, base: Settings | None = None) -> None:
+        self._path = Path(config_dir) / "settings.json"
+        self._base = base or get_settings()
+        self._overrides: dict = {}
+        self._lock = Lock()
+        self._load()
+
+    def _load(self) -> None:
+        if self._path.exists():
+            try:
+                self._overrides = json.loads(self._path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Could not read %s, starting with no overrides: %s", self._path, exc)
+                self._overrides = {}
+
+    def _save(self) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._path.write_text(json.dumps(self._overrides, indent=2), encoding="utf-8")
+
+    def update(self, **kwargs) -> None:
+        """Merges only non-None, known fields and persists to disk."""
+        with self._lock:
+            for key, value in kwargs.items():
+                if key not in EDITABLE_FIELDS:
+                    raise ValueError(f"Unknown or non-editable setting: {key}")
+                if value is not None:
+                    self._overrides[key] = value
+            self._save()
+
+    def is_set(self, field: str) -> bool:
+        value = getattr(self, field)
+        return bool(value)
+
+    def __getattr__(self, name: str):
+        # Only called for attributes not found normally - i.e. anything not
+        # already defined on this instance, which is exactly what we want:
+        # editable fields resolve override-or-base, everything else falls
+        # through to the immutable env-based Settings.
+        if name in EDITABLE_FIELDS:
+            return self._overrides.get(name, getattr(self._base, name))
+        return getattr(self._base, name)
+
+
+def get_runtime_config(request: Request) -> "RuntimeConfigStore":
+    return request.app.state.runtime_config

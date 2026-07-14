@@ -47,4 +47,6 @@ export const api = {
   get: <T>(path: string, token?: string | null) => request<T>(path, { method: 'GET', token }),
   post: <T>(path: string, body?: unknown, token?: string | null) =>
     request<T>(path, { method: 'POST', token, body: body ?? {} }),
+  put: <T>(path: string, body?: unknown, token?: string | null) =>
+    request<T>(path, { method: 'PUT', token, body: body ?? {} }),
 }

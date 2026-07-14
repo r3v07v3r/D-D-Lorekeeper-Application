@@ -4,6 +4,7 @@
 const { app, BrowserWindow, dialog } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('node:path')
+const fs = require('node:fs')
 const http = require('node:http')
 const { spawn, execFile } = require('node:child_process')
 
@@ -22,15 +23,36 @@ function frontendIndexPath() {
   return path.join(process.resourcesPath, 'frontend', 'index.html')
 }
 
+// SQLAlchemy's sqlite URL wants forward slashes even on Windows.
+function toSqliteUrl(filePath) {
+  return `sqlite:///${filePath.replace(/\\/g, '/')}`
+}
+
 function startBackend() {
+  // A stable, per-user, always-writable directory - survives app
+  // reinstalls/updates, unlike the versioned install/resources directory.
+  // This is where the GM's saved settings (Discord token, OpenAI key - see
+  // backend/app/runtime_config.py), the SQLite database, and recordings
+  // all live in the packaged app.
+  const userDataDir = app.getPath('userData')
+  fs.mkdirSync(userDataDir, { recursive: true })
+
   if (app.isPackaged) {
     backendProcess = spawn(backendExecutablePath(), [], {
-      env: { ...process.env, LOREKEEPER_PORT: String(BACKEND_PORT) },
+      env: {
+        ...process.env,
+        LOREKEEPER_PORT: String(BACKEND_PORT),
+        LOREKEEPER_CONFIG_DIR: userDataDir,
+        DATABASE_URL: toSqliteUrl(path.join(userDataDir, 'lorekeeper.db')),
+        AUDIO_STORAGE_DIR: path.join(userDataDir, 'recordings'),
+      },
     })
   } else {
     // Development: run straight from source using the backend's own venv
     // interpreter, so `npm start` here doesn't require a separately
-    // running backend process.
+    // running backend process. Uses the backend's own working directory
+    // (via its .env / defaults) rather than userData, so dev data stays
+    // separate from anything a packaged install would write.
     const backendDir = path.join(__dirname, '..', 'backend')
     const venvPython =
       process.platform === 'win32'

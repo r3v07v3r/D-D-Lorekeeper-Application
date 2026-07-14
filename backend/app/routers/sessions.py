@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.ai.pipeline import process_session
 from app.auth import SessionRecord, get_current_user, require_gm
-from app.config import get_settings
 from app.database import get_db
 from app.models import SessionLog
+from app.runtime_config import RuntimeConfigStore, get_runtime_config
 from app.schemas import SessionLogCreate, SessionLogPublic
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -72,6 +72,7 @@ def process(
     session_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    runtime_config: RuntimeConfigStore = Depends(get_runtime_config),
     _current: SessionRecord = Depends(require_gm),
 ) -> dict[str, str]:
     """Kicks off transcription + summarization for a recorded session.
@@ -84,14 +85,13 @@ def process(
     if log.processing_status == "processing":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already processing")
 
-    settings = get_settings()
-    if not settings.openai_api_key:
+    if not runtime_config.openai_api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OPENAI_API_KEY is not configured",
+            detail="No OpenAI API key configured - add one in Settings",
         )
 
     log.processing_status = "processing"
     db.commit()
-    background_tasks.add_task(process_session, session_id, settings)
+    background_tasks.add_task(process_session, session_id, runtime_config)
     return {"status": "processing"}
