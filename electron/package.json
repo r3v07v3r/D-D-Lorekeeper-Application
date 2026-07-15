@@ -21,6 +21,7 @@
     "appId": "com.lorekeeper.app",
     "productName": "Lorekeeper",
     "asar": true,
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "files": [
       "main.js",
       "preload.js"
