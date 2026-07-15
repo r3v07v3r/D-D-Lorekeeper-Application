@@ -115,9 +115,10 @@ export function SettingsPanel({ token }: { token: string }) {
         <p className="mb-2 text-xs text-slate-400">
           Traffic to this server is encrypted (HTTPS with a certificate your players' apps verify
           automatically via the share code below), so this is safe to use over the internet, not just
-          your home network. To let players reach you from outside your network, forward TCP port{' '}
+          your home network. Lorekeeper tries to open the port on your router automatically (UPnP)
+          on launch; if your router doesn't support that, forward TCP port{' '}
           <span className="font-mono text-slate-300">{settings.server_port}</span> to this computer in
-          your router's settings - players on the same LAN don't need this step.
+          your router's settings instead. Players on the same LAN don't need either step.
         </p>
         {settings.detected_public_ip && (
           <p className="mb-1 text-sm text-slate-300">

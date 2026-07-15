@@ -29,6 +29,7 @@ const LOCAL_BACKEND_URL = `https://127.0.0.1:${BACKEND_PORT}`
 
 let backendProcess = null
 let mainWindow = null
+let upnpGateway = null // set if a router mapping succeeds - unmapped on quit
 
 // hostKey ("host:port") -> expected certificate SHA-256 fingerprint, colon-
 // hex uppercase (Node's tls.TLSSocket#getPeerCertificate().fingerprint256
@@ -176,6 +177,37 @@ async function checkFfmpegAndPrompt() {
   }
 }
 
+// Best-effort automatic router port-forwarding for internet play, so the GM
+// doesn't have to open their router's admin page and configure this by
+// hand (see the Settings tab, which always shows the manual steps too -
+// this is a convenience layer on top of that, never a replacement for it).
+// Deliberately silent on failure: most home routers support UPnP and this
+// will just work, but plenty don't (or have it disabled, or the network is
+// behind carrier-grade NAT where no port mapping is possible at all) - none
+// of that should slow down or interrupt startup. @achingbrain/nat-port-mapper
+// is ESM-only, hence the dynamic import() from this CommonJS file.
+async function attemptUpnpPortMapping(port) {
+  try {
+    const { upnpNat } = await import('@achingbrain/nat-port-mapper')
+    const client = upnpNat({ description: 'Lorekeeper' })
+
+    for await (const gateway of client.findGateways({ signal: AbortSignal.timeout(8000) })) {
+      try {
+        for await (const mapping of gateway.mapAll(port, { protocol: 'tcp' })) {
+          console.log(`[upnp] mapped port ${port} -> ${mapping.externalHost}:${mapping.externalPort} via router`)
+        }
+        upnpGateway = gateway
+        return
+      } catch (err) {
+        console.warn('[upnp] found a router but it would not map the port (may not support UPnP):', err.message)
+      }
+    }
+    console.log('[upnp] no UPnP-capable router found on this network - internet play needs manual port forwarding (see Settings)')
+  } catch (err) {
+    console.warn('[upnp] automatic port mapping unavailable:', err.message)
+  }
+}
+
 // Performs one HTTP(S) request on behalf of the renderer (invoked over IPC
 // from preload.js) and, for HTTPS, manually verifies the live certificate's
 // fingerprint against whatever this connection's hostKey was pinned to -
@@ -245,6 +277,13 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
+    // Only needed in dev: `electron .` runs as the generic Electron.exe, so
+    // without this the window shows Electron's own icon, not ours. In the
+    // packaged app the exe itself already has our icon baked in (via
+    // build.win.icon in package.json), which Electron uses as the window
+    // icon automatically - build/ isn't bundled as an app resource, so this
+    // path wouldn't resolve there anyway.
+    icon: app.isPackaged ? undefined : path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -277,6 +316,10 @@ app.whenReady().then(async () => {
     dialog.showErrorBox('Backend failed to start', String(err))
   }
 
+  // Fire-and-forget: UPnP discovery can take several seconds and must never
+  // delay showing the window.
+  attemptUpnpPortMapping(BACKEND_PORT).catch((err) => console.warn('[upnp] unexpected error:', err))
+
   await createWindow()
 
   if (app.isPackaged) {
@@ -305,5 +348,12 @@ app.on('will-quit', () => {
   if (backendProcess) {
     backendProcess.kill()
     backendProcess = null
+  }
+  if (upnpGateway) {
+    // Best-effort cleanup, same spirit as setting it up - don't leave a
+    // stale port-forward rule sitting in the router after the app closes,
+    // but don't let a slow/failed unmap delay quitting either.
+    upnpGateway.stop().catch(() => {})
+    upnpGateway = null
   }
 })
