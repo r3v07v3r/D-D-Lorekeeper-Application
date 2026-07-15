@@ -14,8 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth import SessionStore
 from app.bot.client import ensure_bot_running
 from app.config import get_settings
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
 from app.dndbeyond.sync import CharacterSyncState
+from app.migrations_runner import run_migrations
 from app.routers import auth, bot_control, characters, notes, sessions, settings as settings_router, soundboard, users
 from app.runtime_config import RuntimeConfigStore
 from app.state import BotState
@@ -50,9 +51,10 @@ app.include_router(soundboard.router)
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    # Phase 1 uses create_all() directly; Alembic is deliberately not wired
-    # up yet (project risk #6) until it's actually needed and set up for real.
-    Base.metadata.create_all(bind=engine)
+    # Alembic-managed schema (see app/migrations_runner.py) - handles both a
+    # genuinely fresh DB and adopting an existing pre-Alembic install (one
+    # created by this app before this revision, via plain create_all()).
+    run_migrations(settings.database_url)
 
     app.state.sessions = SessionStore()
 

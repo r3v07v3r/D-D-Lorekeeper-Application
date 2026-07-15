@@ -4,6 +4,10 @@ sqlalchemy==2.0.35
 pydantic-settings==2.5.2
 python-dotenv==1.0.1
 
+# Schema migrations, run at startup (app/migrations_runner.py) instead of
+# Base.metadata.create_all() - see migrations/ and project risk #6.
+alembic==1.18.5
+
 # python-multipart is required by FastAPI for form/file parsing (used by later
 # routers that accept file uploads, e.g. audio); harmless to include now.
 python-multipart==0.0.9
