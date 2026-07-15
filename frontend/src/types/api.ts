@@ -85,6 +85,11 @@ export interface SettingsPublic {
   recording_chunk_minutes: number
   dndbeyond_sync_interval_minutes: number
   bot_running: boolean
+  campaign_passphrase_set: boolean
+  detected_lan_ip: string | null
+  detected_public_ip: string | null
+  certificate_fingerprint: string
+  server_port: number
 }
 
 export interface SettingsUpdate {
@@ -94,4 +99,24 @@ export interface SettingsUpdate {
   summarization_model?: string
   recording_chunk_minutes?: number
   dndbeyond_sync_interval_minutes?: number
+  campaign_passphrase?: string
+}
+
+export interface SoundClipPublic {
+  id: number
+  name: string
+  volume: number
+  created_at: string
+}
+
+export interface SoundClipUpload {
+  name: string
+  filename: string
+  content_base64: string
+  volume?: number
+}
+
+export interface SoundClipUpdate {
+  name?: string
+  volume?: number
 }

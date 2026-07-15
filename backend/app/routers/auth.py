@@ -1,15 +1,22 @@
-"""Login/logout for the local profile-select screen.
+"""Login/logout for the profile-select screen.
 
 POST /auth/login is the only place a client-supplied user_id is trusted: it
 is how the user identifies *themselves* at the point of login (there is no
-password - see project spec Section 3, this is a single-machine app). From
-that point on, the resulting token - not the user_id - is what every other
-endpoint uses to establish identity and role.
+per-user password - see project spec Section 3). From that point on, the
+resulting token - not the user_id - is what every other endpoint uses to
+establish identity and role.
+
+Now that the backend can be reached from other machines on a LAN (players
+connecting to the GM's instance), trusting a bare user_id with no further
+check would let anyone who can reach the port log in as anyone. That gap is
+closed by require_network_access: a campaign passphrase (set by the GM in
+Settings) gates this endpoint once the backend is reachable beyond the GM's
+own machine - see app.auth for the full reasoning.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import SessionRecord, get_current_user, get_session_store
+from app.auth import SessionRecord, get_current_user, get_session_store, require_network_access
 from app.database import get_db
 from app.models import User
 from app.schemas import LoginRequest, LoginResponse, UserPublic
@@ -17,7 +24,7 @@ from app.schemas import LoginRequest, LoginResponse, UserPublic
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse, dependencies=[Depends(require_network_access)])
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> LoginResponse:
     user = db.get(User, payload.user_id)
     if user is None:

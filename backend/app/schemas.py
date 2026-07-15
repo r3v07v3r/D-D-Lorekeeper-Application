@@ -6,6 +6,7 @@ flags). Those are always derived server-side from the session token - see
 app/auth.py.
 """
 from datetime import date as date_type
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -92,7 +93,7 @@ class NotePublic(BaseModel):
 class SettingsUpdate(BaseModel):
     """All fields optional - PUT /settings only changes what's provided.
     Secrets are write-only: there is no way to read a previously-saved
-    token/key back out (see SettingsPublic), only to overwrite it.
+    token/key/passphrase back out (see SettingsPublic), only to overwrite it.
     """
     discord_bot_token: str | None = None
     openai_api_key: str | None = None
@@ -100,6 +101,7 @@ class SettingsUpdate(BaseModel):
     summarization_model: str | None = None
     recording_chunk_minutes: int | None = None
     dndbeyond_sync_interval_minutes: int | None = None
+    campaign_passphrase: str | None = None
 
 
 class SettingsPublic(BaseModel):
@@ -110,3 +112,38 @@ class SettingsPublic(BaseModel):
     recording_chunk_minutes: int
     dndbeyond_sync_interval_minutes: int
     bot_running: bool
+    campaign_passphrase_set: bool
+    detected_lan_ip: str | None = None
+    detected_public_ip: str | None = None
+    certificate_fingerprint: str
+    server_port: int
+
+
+# ---- Soundboard ----
+
+class SoundClipUpload(BaseModel):
+    """Uploaded as base64 JSON rather than multipart/form-data: the packaged
+    app's requests are proxied through Electron's main process over IPC
+    (see frontend/src/api/client.ts), which only carries a string body, not
+    a real multipart stream. Clips are short sound effects, so the ~33%
+    base64 overhead is a fine trade for keeping one request path for
+    everything rather than a special case for file uploads.
+    """
+    name: str
+    filename: str  # original filename, used only to read the extension
+    content_base64: str
+    volume: float = 1.0
+
+
+class SoundClipUpdate(BaseModel):
+    name: str | None = None
+    volume: float | None = None
+
+
+class SoundClipPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    volume: float
+    created_at: datetime

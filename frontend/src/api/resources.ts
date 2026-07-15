@@ -10,6 +10,9 @@ import type {
   SessionLogPublic,
   SettingsPublic,
   SettingsUpdate,
+  SoundClipPublic,
+  SoundClipUpdate,
+  SoundClipUpload,
   UserPublic,
 } from '../types/api'
 
@@ -52,3 +55,13 @@ export const stopRecording = (token: string) => api.post<void>('/bot/record/stop
 export const getSettings = (token: string) => api.get<SettingsPublic>('/settings', token)
 export const updateSettings = (token: string, payload: SettingsUpdate) =>
   api.put<SettingsPublic>('/settings', payload, token)
+
+export const listSoundClips = (token: string) => api.get<SoundClipPublic[]>('/soundboard', token)
+export const uploadSoundClip = (token: string, payload: SoundClipUpload) =>
+  api.post<SoundClipPublic>('/soundboard', payload, token)
+export const updateSoundClip = (token: string, clipId: number, payload: SoundClipUpdate) =>
+  api.patch<SoundClipPublic>(`/soundboard/${clipId}`, payload, token)
+export const deleteSoundClip = (token: string, clipId: number) => api.delete<void>(`/soundboard/${clipId}`, token)
+export const playSoundClip = (token: string, clipId: number) =>
+  api.post<void>(`/soundboard/${clipId}/play`, undefined, token)
+export const stopSoundClip = (token: string) => api.post<void>('/soundboard/stop', undefined, token)

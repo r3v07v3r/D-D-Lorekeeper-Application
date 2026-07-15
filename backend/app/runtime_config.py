@@ -14,8 +14,10 @@ at `app.getPath('userData')` (a stable per-user directory that survives
 app reinstalls/updates) - see electron/main.js. In dev, it defaults to the
 backend's own working directory.
 """
+import hashlib
 import json
 import logging
+import secrets
 from pathlib import Path
 from threading import Lock
 
@@ -24,6 +26,8 @@ from fastapi import Request
 from app.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
+
+_PBKDF2_ITERATIONS = 200_000
 
 # The only fields editable via the Settings API/UI - deliberately a subset
 # of Settings, not all of it (see module docstring for why).
@@ -73,6 +77,39 @@ class RuntimeConfigStore:
     def is_set(self, field: str) -> bool:
         value = getattr(self, field)
         return bool(value)
+
+    # ---- Campaign passphrase ----
+    #
+    # Gates the only two unauthenticated endpoints (GET /users, POST
+    # /auth/login) once the backend is reachable from more than just the
+    # GM's own machine (see app.auth.require_network_access). Stored
+    # salted+hashed via PBKDF2, never in plaintext - unlike the other
+    # secrets above (Discord token, OpenAI key), which the app itself needs
+    # to present verbatim to a third-party API and so cannot be one-way
+    # hashed.
+
+    def set_passphrase(self, raw: str) -> None:
+        with self._lock:
+            if not raw:
+                self._overrides.pop("campaign_passphrase_hash", None)
+            else:
+                salt = secrets.token_hex(16)
+                digest = hashlib.pbkdf2_hmac("sha256", raw.encode("utf-8"), bytes.fromhex(salt), _PBKDF2_ITERATIONS).hex()
+                self._overrides["campaign_passphrase_hash"] = f"{salt}${digest}"
+            self._save()
+
+    def has_passphrase(self) -> bool:
+        return bool(self._overrides.get("campaign_passphrase_hash"))
+
+    def verify_passphrase(self, raw: str) -> bool:
+        stored = self._overrides.get("campaign_passphrase_hash")
+        if not stored or "$" not in stored:
+            return False
+        salt, _, expected_digest = stored.partition("$")
+        actual_digest = hashlib.pbkdf2_hmac(
+            "sha256", (raw or "").encode("utf-8"), bytes.fromhex(salt), _PBKDF2_ITERATIONS
+        ).hex()
+        return secrets.compare_digest(actual_digest, expected_digest)
 
     def __getattr__(self, name: str):
         # Only called for attributes not found normally - i.e. anything not

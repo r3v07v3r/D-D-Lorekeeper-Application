@@ -16,9 +16,10 @@ from app.bot.client import ensure_bot_running
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
 from app.dndbeyond.sync import CharacterSyncState
-from app.routers import auth, bot_control, characters, notes, sessions, settings as settings_router, users
+from app.routers import auth, bot_control, characters, notes, sessions, settings as settings_router, soundboard, users
 from app.runtime_config import RuntimeConfigStore
 from app.state import BotState
+from app.tls import ensure_certificate, get_fingerprint
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ app.include_router(notes.router)
 app.include_router(bot_control.router)
 app.include_router(characters.router)
 app.include_router(settings_router.router)
+app.include_router(soundboard.router)
 
 
 @app.on_event("startup")
@@ -64,6 +66,14 @@ async def on_startup() -> None:
     config_dir = Path(os.environ.get("LOREKEEPER_CONFIG_DIR", "."))
     runtime_config = RuntimeConfigStore(config_dir, base=settings)
     app.state.runtime_config = runtime_config
+
+    # run.py already generated this (it has to, to pass ssl_certfile/keyfile
+    # to uvicorn before the app even starts) - ensure_certificate is
+    # idempotent, so calling it again here just returns the same paths, and
+    # gives this module a self-contained way to know the fingerprint to
+    # expose via Settings without run.py having to pass it through.
+    cert_path, _key_path = ensure_certificate(config_dir)
+    app.state.tls_fingerprint = get_fingerprint(cert_path)
 
     if not runtime_config.discord_bot_token:
         logger.warning("No Discord bot token configured yet - running API-only until one is set via Settings")

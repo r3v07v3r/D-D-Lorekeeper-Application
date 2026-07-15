@@ -1,8 +1,10 @@
-"""SQLAlchemy models: Users, SessionLogs, Notes."""
+"""SQLAlchemy models: Users, SessionLogs, Notes, SoundClips."""
 from datetime import date as date_type
+from datetime import datetime
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from app.database import Base
 
@@ -70,3 +72,22 @@ class Note(Base):
     session: Mapped["SessionLog"] = relationship(back_populates="notes")
     author: Mapped["User"] = relationship(foreign_keys=[author_id])
     target_player: Mapped["User | None"] = relationship(foreign_keys=[target_player_id])
+
+
+class SoundClip(Base):
+    """A GM soundboard clip, played into the Discord voice channel via the
+    bot (see app.bot.controller.play_clip). One shared library, not scoped
+    to a session/campaign - matches "GM's personal soundboard" rather than
+    per-session sound cues, which is out of scope unless asked for.
+    """
+
+    __tablename__ = "sound_clips"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    # Filename on disk under AUDIO_STORAGE_DIR/soundboard/ - a generated,
+    # collision-proof name, not the user's original filename (which is only
+    # used to sniff the extension at upload time).
+    filename: Mapped[str] = mapped_column(String, nullable=False)
+    volume: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

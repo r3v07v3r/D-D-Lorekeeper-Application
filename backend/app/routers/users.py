@@ -1,18 +1,22 @@
 """User registry for the profile-select login screen.
 
-GET /users is intentionally unauthenticated: the profile-select screen needs
-to list registered users *before* anyone has a session token. It only
-exposes username/role/id, not anything sensitive, so this is safe.
+GET /users has no session-token requirement (there's no token to have yet at
+this point in the flow), but it - like POST /users and POST /auth/login - is
+still gated by require_network_access: now that the backend can be reached
+from other machines on a LAN (not just the GM's own PC), "no token required"
+must not mean "no gate at all". See app.auth.require_network_access.
 
 POST /users (registering a new player/GM profile) has one special case: the
 very first account (bootstrapping the GM on first run) is allowed without a
-token, since no session can exist yet. Once a GM account exists, creating
-further accounts requires an authenticated GM session.
+session token, since no session can exist yet - but still requires passing
+require_network_access, which restricts that bootstrap window to the GM's
+own machine until a passphrase is set. Once a GM account exists, creating
+further accounts additionally requires an authenticated GM session.
 """
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import get_session_store
+from app.auth import get_session_store, require_network_access
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserPublic
@@ -20,12 +24,17 @@ from app.schemas import UserCreate, UserPublic
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("", response_model=list[UserPublic])
+@router.get("", response_model=list[UserPublic], dependencies=[Depends(require_network_access)])
 def list_users(db: Session = Depends(get_db)) -> list[User]:
     return db.query(User).order_by(User.id).all()
 
 
-@router.post("", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=UserPublic,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_network_access)],
+)
 def create_user(
     payload: UserCreate,
     request: Request,

@@ -21,3 +21,8 @@ openai==1.51.0
 
 # D&D Beyond sync (Phase 3): HTTP client for the character-service API.
 httpx==0.27.2
+
+# Self-signed TLS certificate generation, so traffic (including the
+# campaign passphrase and session tokens) is encrypted once the backend is
+# reachable beyond the GM's own machine - see app/tls.py.
+cryptography==43.0.3

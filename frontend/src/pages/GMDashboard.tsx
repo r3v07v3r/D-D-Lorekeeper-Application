@@ -5,9 +5,10 @@ import { NotesPanel } from '../components/NotesPanel'
 import { BotControlPanel } from '../components/BotControlPanel'
 import { PartyOverview } from '../components/PartyOverview'
 import { SettingsPanel } from '../components/SettingsPanel'
+import { SoundboardPanel } from '../components/SoundboardPanel'
 import type { SessionLogPublic, UserPublic } from '../types/api'
 
-type Tab = 'sessions' | 'party' | 'bot' | 'settings'
+type Tab = 'sessions' | 'party' | 'bot' | 'soundboard' | 'settings'
 
 export function GMDashboard() {
   const { token } = useAuth()
@@ -79,7 +80,7 @@ export function GMDashboard() {
   return (
     <div className="space-y-4">
       <nav className="flex gap-2 border-b border-slate-800">
-        {(['sessions', 'party', 'bot', 'settings'] as Tab[]).map((t) => (
+        {(['sessions', 'party', 'bot', 'soundboard', 'settings'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -194,6 +195,8 @@ export function GMDashboard() {
       {tab === 'party' && <PartyOverview token={token} />}
 
       {tab === 'bot' && <BotControlPanel token={token} activeSessionId={selectedId} />}
+
+      {tab === 'soundboard' && <SoundboardPanel token={token} />}
 
       {tab === 'settings' && <SettingsPanel token={token} />}
     </div>

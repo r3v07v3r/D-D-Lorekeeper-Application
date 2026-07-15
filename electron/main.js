@@ -1,18 +1,40 @@
 // Electron main process: spawns the Python backend (compiled with
 // PyInstaller in production, or the dev venv's interpreter in development),
 // waits for it to come up, then loads the React dashboard.
-const { app, BrowserWindow, dialog } = require('electron')
+//
+// The backend serves HTTPS with a self-signed certificate (see
+// backend/app/tls.py) rather than plain HTTP, so a campaign passphrase and
+// session tokens are never sent in the clear once players are connecting
+// over the internet, not just a LAN. Since there's no CA trust for a
+// self-signed cert, this process does the actual HTTP(S) requests itself
+// (not the renderer's fetch()) using Node's https module, and manually
+// verifies the live certificate's SHA-256 fingerprint against whichever
+// fingerprint the renderer has told it to trust for that server - either
+// this machine's own backend (registered automatically below) or a remote
+// GM's server (registered from a pasted share code - see preload.js /
+// frontend/src/api/serverConfig.ts). This is the same trust model as SSH
+// host key checking: a mismatch means the connection is refused outright,
+// never silently downgraded to "trust anything".
+const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('node:path')
 const fs = require('node:fs')
+const https = require('node:https')
 const http = require('node:http')
+const crypto = require('node:crypto')
 const { spawn, execFile } = require('node:child_process')
 
 const BACKEND_PORT = 8000
-const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`
+const LOCAL_BACKEND_URL = `https://127.0.0.1:${BACKEND_PORT}`
 
 let backendProcess = null
 let mainWindow = null
+
+// hostKey ("host:port") -> expected certificate SHA-256 fingerprint, colon-
+// hex uppercase (Node's tls.TLSSocket#getPeerCertificate().fingerprint256
+// format). Populated for this machine's own backend once it's confirmed
+// healthy, and for whichever remote server the renderer connects to.
+const trustedFingerprints = new Map()
 
 function backendExecutablePath() {
   const exeName = process.platform === 'win32' ? 'lorekeeper-backend.exe' : 'lorekeeper-backend'
@@ -28,38 +50,34 @@ function toSqliteUrl(filePath) {
   return `sqlite:///${filePath.replace(/\\/g, '/')}`
 }
 
+function backendConfigDir() {
+  return app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'backend')
+}
+
 function startBackend() {
-  // A stable, per-user, always-writable directory - survives app
-  // reinstalls/updates, unlike the versioned install/resources directory.
-  // This is where the GM's saved settings (Discord token, OpenAI key - see
-  // backend/app/runtime_config.py), the SQLite database, and recordings
-  // all live in the packaged app.
-  const userDataDir = app.getPath('userData')
-  fs.mkdirSync(userDataDir, { recursive: true })
+  const configDir = backendConfigDir()
+  fs.mkdirSync(configDir, { recursive: true })
 
   if (app.isPackaged) {
     backendProcess = spawn(backendExecutablePath(), [], {
       env: {
         ...process.env,
         LOREKEEPER_PORT: String(BACKEND_PORT),
-        LOREKEEPER_CONFIG_DIR: userDataDir,
-        DATABASE_URL: toSqliteUrl(path.join(userDataDir, 'lorekeeper.db')),
-        AUDIO_STORAGE_DIR: path.join(userDataDir, 'recordings'),
+        LOREKEEPER_CONFIG_DIR: configDir,
+        DATABASE_URL: toSqliteUrl(path.join(configDir, 'lorekeeper.db')),
+        AUDIO_STORAGE_DIR: path.join(configDir, 'recordings'),
       },
     })
   } else {
     // Development: run straight from source using the backend's own venv
     // interpreter, so `npm start` here doesn't require a separately
-    // running backend process. Uses the backend's own working directory
-    // (via its .env / defaults) rather than userData, so dev data stays
-    // separate from anything a packaged install would write.
-    const backendDir = path.join(__dirname, '..', 'backend')
+    // running backend process.
     const venvPython =
       process.platform === 'win32'
-        ? path.join(backendDir, 'venv', 'Scripts', 'python.exe')
-        : path.join(backendDir, 'venv', 'bin', 'python')
+        ? path.join(configDir, 'venv', 'Scripts', 'python.exe')
+        : path.join(configDir, 'venv', 'bin', 'python')
     backendProcess = spawn(venvPython, ['run.py'], {
-      cwd: backendDir,
+      cwd: configDir,
       env: { ...process.env, LOREKEEPER_PORT: String(BACKEND_PORT) },
     })
   }
@@ -79,7 +97,13 @@ function waitForBackend(timeoutMs = 20000) {
   const start = Date.now()
   return new Promise((resolve, reject) => {
     const attempt = () => {
-      const req = http.get(`${BACKEND_URL}/health`, (res) => {
+      // rejectUnauthorized: false here only because this is polling our own
+      // just-spawned local process purely to learn "is it listening yet" -
+      // no credentials or app data are sent on this request, and real trust
+      // (registerLocalTrust) is established separately right after this
+      // resolves, before the renderer ever talks to the backend.
+      const req = https.get(`${LOCAL_BACKEND_URL}/health`, { rejectUnauthorized: false }, (res) => {
+        res.resume()
         if (res.statusCode === 200) resolve()
         else retry()
       })
@@ -100,11 +124,122 @@ function waitForBackend(timeoutMs = 20000) {
   })
 }
 
+// Reads the certificate the backend just generated for itself (see
+// backend/app/tls.py) and trusts it for our own loopback connection -
+// this is the one case where "trust on first use" is unconditionally safe,
+// since we spawned this exact process ourselves moments ago.
+function registerLocalTrust() {
+  try {
+    const certPath = path.join(backendConfigDir(), 'cert.pem')
+    const certPem = fs.readFileSync(certPath, 'utf8')
+    const cert = new crypto.X509Certificate(certPem)
+    trustedFingerprints.set(`127.0.0.1:${BACKEND_PORT}`, cert.fingerprint256)
+    console.log('[tls] trusting local backend certificate', cert.fingerprint256)
+  } catch (err) {
+    console.error('[tls] could not read local certificate for pinning:', err)
+  }
+}
+
 function checkFfmpegOnPath() {
   return new Promise((resolve) => {
     execFile('ffmpeg', ['-version'], (error) => resolve(!error))
   })
 }
+
+// ffmpeg is a required external dependency (project risk #5) - it is not
+// and cannot easily be bundled into the app, so this checks for it at every
+// launch and, if missing, offers a one-click path to fix it rather than
+// just stating the problem.
+async function checkFfmpegAndPrompt() {
+  const ffmpegOk = await checkFfmpegOnPath()
+  if (ffmpegOk) return
+
+  const wingetHint =
+    process.platform === 'win32'
+      ? 'Quickest fix on Windows: open a terminal (PowerShell or Command Prompt) and run:\n\n    winget install ffmpeg\n\nThen restart Lorekeeper.'
+      : process.platform === 'darwin'
+        ? 'Quickest fix on macOS (with Homebrew installed): open a terminal and run:\n\n    brew install ffmpeg\n\nThen restart Lorekeeper.'
+        : 'Install it with your distribution\'s package manager, e.g.:\n\n    sudo apt install ffmpeg\n\nThen restart Lorekeeper.'
+
+  const { response } = await dialog.showMessageBox({
+    type: 'warning',
+    title: 'ffmpeg not found',
+    message: "Lorekeeper needs ffmpeg for voice recording and transcription, and it wasn't found on your system PATH.",
+    detail: `${wingetHint}\n\nThe app will continue to start, but recording and transcription will fail until ffmpeg is installed.`,
+    buttons: ['Open ffmpeg.org download page', 'Continue without it'],
+    defaultId: 0,
+    cancelId: 1,
+  })
+
+  if (response === 0) {
+    await shell.openExternal('https://ffmpeg.org/download.html')
+  }
+}
+
+// Performs one HTTP(S) request on behalf of the renderer (invoked over IPC
+// from preload.js) and, for HTTPS, manually verifies the live certificate's
+// fingerprint against whatever this connection's hostKey was pinned to -
+// see the module docstring above for why this can't just rely on normal CA
+// trust. Any mismatch is a hard failure: no data is returned to the
+// renderer, and the request is treated as failed.
+function performRequest({ url, method, headers, body }) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url)
+    const isHttps = parsed.protocol === 'https:'
+    const lib = isHttps ? https : http
+    const hostKey = `${parsed.hostname}:${parsed.port || (isHttps ? 443 : 80)}`
+    const expectedFingerprint = trustedFingerprints.get(hostKey)
+
+    if (isHttps && !expectedFingerprint) {
+      reject(new Error('No trusted certificate fingerprint on file for this server - refusing to connect.'))
+      return
+    }
+
+    const req = lib.request(
+      // agent: false forces a brand-new socket (and, for HTTPS, a brand-new
+      // TLS handshake) for every single request. This was verified to
+      // matter, not just a theoretical concern: with Node's default pooling
+      // agent, a request could be served over a socket from an earlier
+      // connection without re-validating the certificate fresh, which would
+      // defeat the pinning check below.
+      url,
+      { method, headers, rejectUnauthorized: false, agent: false },
+      (res) => {
+        if (isHttps) {
+          const cert = res.socket.getPeerCertificate()
+          if (!cert || cert.fingerprint256 !== expectedFingerprint) {
+            res.destroy()
+            reject(new Error('Server certificate does not match the trusted fingerprint for this connection.'))
+            return
+          }
+        }
+        const chunks = []
+        res.on('data', (chunk) => chunks.push(chunk))
+        res.on('end', () => {
+          resolve({
+            status: res.statusCode,
+            body: Buffer.concat(chunks).toString('utf8'),
+          })
+        })
+      },
+    )
+    req.on('error', reject)
+    if (body) req.write(body)
+    req.end()
+  })
+}
+
+ipcMain.handle('lorekeeper:api-request', async (_event, payload) => {
+  try {
+    return await performRequest(payload)
+  } catch (err) {
+    return { status: 0, body: '', error: String(err.message || err) }
+  }
+})
+
+ipcMain.on('lorekeeper:trust-fingerprint', (_event, hostKey, fingerprint) => {
+  trustedFingerprints.set(hostKey, fingerprint)
+})
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -133,18 +268,11 @@ async function createWindow() {
 app.whenReady().then(async () => {
   startBackend()
 
-  const [ffmpegOk] = await Promise.all([checkFfmpegOnPath(), Promise.resolve()])
-  if (!ffmpegOk) {
-    dialog.showErrorBox(
-      'ffmpeg not found',
-      'Lorekeeper requires ffmpeg to be installed and available on your system PATH ' +
-        'for voice recording and transcription to work. The app will continue to start, ' +
-        'but recording/transcription features will fail until ffmpeg is installed.',
-    )
-  }
+  await checkFfmpegAndPrompt()
 
   try {
     await waitForBackend()
+    registerLocalTrust()
   } catch (err) {
     dialog.showErrorBox('Backend failed to start', String(err))
   }

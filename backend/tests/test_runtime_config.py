@@ -65,3 +65,46 @@ def test_update_rejects_unknown_field(tmp_path, base_settings):
 def test_non_editable_fields_fall_through_to_base(tmp_path, base_settings):
     store = RuntimeConfigStore(tmp_path, base=base_settings)
     assert store.audio_storage_dir == base_settings.audio_storage_dir
+
+
+def test_no_passphrase_set_by_default(tmp_path, base_settings):
+    store = RuntimeConfigStore(tmp_path, base=base_settings)
+    assert store.has_passphrase() is False
+    assert store.verify_passphrase("anything") is False
+    assert store.verify_passphrase("") is False
+
+
+def test_set_passphrase_verifies_correctly(tmp_path, base_settings):
+    store = RuntimeConfigStore(tmp_path, base=base_settings)
+    store.set_passphrase("open-sesame")
+
+    assert store.has_passphrase() is True
+    assert store.verify_passphrase("open-sesame") is True
+    assert store.verify_passphrase("wrong-phrase") is False
+    assert store.verify_passphrase("") is False
+
+
+def test_passphrase_never_stored_in_plaintext(tmp_path, base_settings):
+    store = RuntimeConfigStore(tmp_path, base=base_settings)
+    store.set_passphrase("open-sesame")
+
+    raw_contents = (tmp_path / "settings.json").read_text(encoding="utf-8")
+    assert "open-sesame" not in raw_contents
+
+
+def test_passphrase_persists_across_instances(tmp_path, base_settings):
+    store = RuntimeConfigStore(tmp_path, base=base_settings)
+    store.set_passphrase("open-sesame")
+
+    reloaded = RuntimeConfigStore(tmp_path, base=base_settings)
+    assert reloaded.has_passphrase() is True
+    assert reloaded.verify_passphrase("open-sesame") is True
+
+
+def test_setting_empty_passphrase_clears_it(tmp_path, base_settings):
+    store = RuntimeConfigStore(tmp_path, base=base_settings)
+    store.set_passphrase("open-sesame")
+    store.set_passphrase("")
+
+    assert store.has_passphrase() is False
+    assert store.verify_passphrase("open-sesame") is False

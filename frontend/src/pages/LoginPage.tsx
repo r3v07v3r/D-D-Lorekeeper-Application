@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api/client'
+import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
+import { ServerConnect } from '../components/ServerConnect'
 import type { UserPublic } from '../types/api'
 
 export function LoginPage() {
@@ -23,8 +24,14 @@ export function LoginPage() {
     try {
       setUsers(await api.get<UserPublic[]>('/users'))
       setError(null)
-    } catch {
-      setError('Could not reach the Lorekeeper backend. Is it running?')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Wrong campaign passphrase - check with your GM and try again.')
+      } else if (err instanceof ApiError && err.status === 403) {
+        setError("This server isn't accepting remote connections yet - the GM needs to set a campaign passphrase in Settings first.")
+      } else {
+        setError('Could not reach that server. Check the address and that it is running.')
+      }
     } finally {
       setLoading(false)
     }
@@ -60,7 +67,9 @@ export function LoginPage() {
     <div className="flex min-h-full items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
         <h1 className="mb-1 text-2xl font-semibold text-slate-100">Lorekeeper</h1>
-        <p className="mb-6 text-sm text-slate-400">Choose your profile to continue.</p>
+        <p className="mb-4 text-sm text-slate-400">Choose your profile to continue.</p>
+
+        <ServerConnect onChanged={refreshUsers} />
 
         {error && (
           <div className="mb-4 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-300">
@@ -70,7 +79,7 @@ export function LoginPage() {
 
         {loading ? (
           <p className="text-sm text-slate-500">Loading profiles...</p>
-        ) : users.length > 0 ? (
+        ) : error ? null : users.length > 0 ? (
           <ul className="space-y-2">
             {users.map((user) => (
               <li key={user.id}>
@@ -105,6 +114,10 @@ export function LoginPage() {
             >
               {creating ? 'Creating...' : 'Create GM profile'}
             </button>
+            <p className="text-xs text-slate-500">
+              After logging in, add your players from the Party tab. They can join from their own
+              computer using "Joining someone else's game?" above.
+            </p>
           </form>
         )}
       </div>

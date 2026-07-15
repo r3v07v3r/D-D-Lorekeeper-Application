@@ -5,6 +5,7 @@ or "start recording" behaves identically regardless of which surface
 triggered it, and both surfaces share the same BotState (risk #7).
 """
 import logging
+from pathlib import Path
 
 import discord
 
@@ -71,3 +72,43 @@ async def stop_recording(bot_state: BotState) -> None:
     bot_state.recorder = None
     bot_state.is_recording = False
     bot_state.current_session_log_id = None
+
+
+def play_clip(bot_state: BotState, file_path: Path, volume: float = 1.0) -> None:
+    """Plays a soundboard clip into the connected voice channel.
+
+    Independent of recording - verified against Pycord's VoiceClient source
+    that play() only checks connection/is_playing state and start_recording()
+    only checks connection/is_recording state, so a session recording in
+    progress is completely unaffected by a sound effect playing over it (and
+    vice versa): they're separate outbound/inbound audio streams.
+
+    If a clip is already playing, it's stopped first rather than raising -
+    on a soundboard, clicking a new sound while one is playing should
+    interrupt it, not require an explicit "stop" click first.
+    """
+    if bot_state.voice_client is None or not bot_state.voice_client.is_connected():
+        raise VoiceControlError("Join a voice channel before playing a sound.")
+    if not file_path.exists():
+        raise VoiceControlError(f"Sound file not found: {file_path.name}")
+
+    if bot_state.voice_client.is_playing():
+        bot_state.voice_client.stop()
+
+    def _after_playback(error: Exception | None) -> None:
+        if error is not None:
+            logger.error("Soundboard playback error: %s", error)
+
+    try:
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(str(file_path)), volume=volume)
+        bot_state.voice_client.play(source, after=_after_playback)
+    except discord.ClientException as exc:
+        raise VoiceControlError(f"Could not play sound: {exc}") from exc
+
+
+def stop_playback(bot_state: BotState) -> None:
+    if bot_state.voice_client is None or not bot_state.voice_client.is_connected():
+        raise VoiceControlError("Not currently connected to a voice channel.")
+    if not bot_state.voice_client.is_playing():
+        raise VoiceControlError("Nothing is currently playing.")
+    bot_state.voice_client.stop()

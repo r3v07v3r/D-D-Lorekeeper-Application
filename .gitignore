@@ -25,3 +25,9 @@ build/
 # Electron packaging output
 release/
 
+# Built installers placed in the repo root for local testing. Deliberately
+# not committed: the exe is ~106MB, over GitHub's hard 100MB per-file push
+# limit - distribute installers via GitHub Releases instead (which is also
+# what the auto-updater expects).
+Lorekeeper-Setup-*.exe
+
