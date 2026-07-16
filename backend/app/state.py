@@ -15,9 +15,16 @@ class BotState:
     current_session_log_id: int | None = None
     recorder: object | None = None  # app.bot.recorder.VoiceRecorder, set once recording starts
     is_recording: bool = False
+    # Discord user IDs (as strings, matching User.discord_id's column type)
+    # currently in the same voice channel as the bot - real Discord-voice
+    # presence, kept fresh by on_voice_state_update (see app/bot/client.py)
+    # and initialized on join (see app/bot/controller.py:join_channel).
+    # Empty whenever the bot isn't connected to a channel.
+    voice_member_discord_ids: set[str] = field(default_factory=set)
 
     def reset_voice(self) -> None:
         self.voice_client = None
         self.current_session_log_id = None
         self.recorder = None
         self.is_recording = False
+        self.voice_member_discord_ids = set()

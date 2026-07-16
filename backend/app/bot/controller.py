@@ -31,6 +31,11 @@ async def join_channel(bot_state: BotState, channel: discord.VoiceChannel) -> No
         bot_state.voice_client = await channel.connect()
     except discord.ClientException as exc:
         raise VoiceControlError(f"Could not join voice channel: {exc}") from exc
+    # Seeds the initial membership snapshot immediately - on_voice_state_update
+    # (see app/bot/client.py) only fires on the *next* join/leave/move, so
+    # without this, anyone already sitting in the channel before the bot
+    # joined would show as absent until they left and rejoined.
+    bot_state.voice_member_discord_ids = {str(m.id) for m in channel.members if not m.bot}
 
 
 async def leave_channel(bot_state: BotState) -> None:

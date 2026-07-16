@@ -36,6 +36,10 @@ export const createPlayer = (
 // though the backend's response_model is dict[int, bool] (see
 // backend/app/routers/users.py:get_presence).
 export const getUserPresence = (token: string) => api.get<Record<string, boolean>>('/users/presence', token)
+// Real Discord voice-channel presence (is this user in the same channel as
+// the bot right now), distinct from getUserPresence's app-connectivity
+// check above - see backend/app/routers/users.py:get_voice_presence.
+export const getVoicePresence = (token: string) => api.get<Record<string, boolean>>('/users/voice-presence', token)
 
 export const listSessions = (token: string) => api.get<SessionLogPublic[]>('/sessions', token)
 export const getSession = (token: string, id: number) => api.get<SessionLogPublic>(`/sessions/${id}`, token)

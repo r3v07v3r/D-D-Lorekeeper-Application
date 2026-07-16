@@ -19,6 +19,11 @@ class User(Base):
     role: Mapped[str] = mapped_column(String, nullable=False)
     discord_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     dnd_beyond_character_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Cumulative seconds across all past logged-in sessions - checkpointed at
+    # logout (see app/routers/auth.py), so the currently-open session's time
+    # isn't included until it ends. Powers the Home dashboard's "time in
+    # Lorekeeper" stat (project risk: no fabricated placeholder stats).
+    total_seconds_active: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class Campaign(Base):

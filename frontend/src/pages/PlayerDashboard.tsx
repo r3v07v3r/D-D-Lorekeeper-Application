@@ -5,6 +5,7 @@ import { CharacterSheet } from '../components/CharacterSheet'
 import { CharacterIcon, SessionsIcon } from '../components/icons'
 import { NotesPanel } from '../components/NotesPanel'
 import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
+import { formatDuration } from '../utils/formatDuration'
 import type { CampaignPublic, CharacterPublic, SessionLogPublic } from '../types/api'
 
 type Tab = 'character' | 'sessions'
@@ -43,11 +44,16 @@ export function PlayerDashboard() {
 
   return (
     <div className="space-y-3">
-      {campaign && (
-        <h2 className="text-sm font-medium text-[var(--text-muted)]">
-          Campaign: <span className="text-[var(--text)]">{campaign.name}</span>
-        </h2>
-      )}
+      <div className="flex items-center justify-between">
+        {campaign && (
+          <h2 className="text-sm font-medium text-[var(--text-muted)]">
+            Campaign: <span className="text-[var(--text)]">{campaign.name}</span>
+          </h2>
+        )}
+        <span className="text-xs text-[var(--text-faint)]">
+          {formatDuration(user.total_seconds_active)} in Lorekeeper
+        </span>
+      </div>
 
       <div className="flex gap-4">
         <Sidebar navItems={NAV_ITEMS} active={tab} onSelect={(key) => setTab(key as Tab)} />

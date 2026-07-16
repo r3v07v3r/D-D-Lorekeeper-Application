@@ -16,7 +16,8 @@ below): it doesn't need to survive a backend restart, and restarting the
 server naturally invalidates all sessions.
 """
 import secrets
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from threading import Lock
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -31,6 +32,10 @@ class SessionRecord:
     user_id: int
     username: str
     role: Role
+    # time.monotonic() at login - used to checkpoint total_seconds_active on
+    # logout (see app/routers/auth.py). Monotonic, not wall-clock time, so a
+    # system clock change mid-session can't produce a bogus/negative delta.
+    created_at: float = field(default_factory=time.monotonic)
 
 
 class SessionStore:
@@ -55,9 +60,13 @@ class SessionStore:
         with self._lock:
             return self._sessions.get(token)
 
-    def delete(self, token: str) -> None:
+    def delete(self, token: str) -> SessionRecord | None:
+        """Returns the removed record (or None if the token was already
+        gone) so the caller can checkpoint its elapsed connected time - see
+        app/routers/auth.py:logout.
+        """
         with self._lock:
-            self._sessions.pop(token, None)
+            return self._sessions.pop(token, None)
 
     def connected_user_ids(self) -> set[int]:
         """user_ids with at least one live session token right now - the

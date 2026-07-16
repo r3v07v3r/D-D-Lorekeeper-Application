@@ -10,6 +10,7 @@ export interface UserPublic {
   role: Role
   discord_id: string | null
   dnd_beyond_character_id: string | null
+  total_seconds_active: number
 }
 
 export interface LoginResponse {

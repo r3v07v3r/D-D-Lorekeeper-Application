@@ -24,6 +24,7 @@ class UserPublic(BaseModel):
     role: Role
     discord_id: str | None = None
     dnd_beyond_character_id: str | None = None
+    total_seconds_active: int = 0
 
 
 class UserCreate(BaseModel):
