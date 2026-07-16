@@ -72,6 +72,10 @@ export function PartyOverview({ token }: { token: string }) {
           {syncing ? 'Syncing...' : 'Sync from D&D Beyond'}
         </button>
       </div>
+      <p className="-mt-2 text-xs text-[var(--text-faint)]">
+        Optional: only reads characters you already have access to in your own D&D Beyond account.
+        Lorekeeper is an independent app, not affiliated with or endorsed by D&D Beyond.
+      </p>
 
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 

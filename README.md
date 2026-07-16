@@ -4,12 +4,20 @@ An AI-powered campaign companion for Dungeons & Dragons groups that play over Di
 
 Lorekeeper joins your Discord voice channel, records each player's audio during a session,
 transcribes it with Whisper, and generates two AI summaries: an uncensored **Master Summary**
-for the GM and a spoiler-safe **recap** for players. It also syncs live character data
-(HP, AC, passive perception, inventory) from D&D Beyond, keeps GM/player-scoped session
-notes, and gives the GM a soundboard that plays sound effects into the voice channel.
+for the GM and a spoiler-safe **recap** for players. It also keeps GM/player-scoped session
+notes, gives the GM a soundboard that plays sound effects into the voice channel, and - if
+you choose to link a character - can optionally import and sync live character data (HP,
+AC, passive perception, inventory) from D&D Beyond.
 
 The GM runs the app and hosts the campaign; players install the same app on their own
 computers and connect to the GM with a one-line **share code**.
+
+Lorekeeper is a standalone, independent application. It is not affiliated with, endorsed
+by, or sponsored by D&D Beyond, Wizards of the Coast, or Hasbro. The optional D&D Beyond
+sync described below only reads data for characters you already have access to in your
+own account - Lorekeeper doesn't store, redistribute, or claim ownership of any D&D Beyond
+or Dungeons & Dragons content, and works fully without it if you'd rather build characters
+by hand. "D&D Beyond" and "Dungeons & Dragons" are trademarks of their respective owners.
 
 ---
 
