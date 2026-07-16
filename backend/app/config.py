@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     whisper_model: str = "whisper-1"
     summarization_model: str = "gpt-4o"
 
+    # Summarization provider: "openai" (paid, hosted) or "ollama" (free,
+    # local - see app/ai/summarization.py). Ollama exposes an OpenAI-compatible
+    # endpoint, so the same `openai` SDK client works for both; only the
+    # base_url/api_key differ (see app/ai/pipeline.py's build_llm_client()).
+    llm_provider: str = "openai"
+    ollama_base_url: str = "http://localhost:11434/v1"
+
+    # Transcription provider: "openai" (Whisper API, paid) or "local"
+    # (faster-whisper, free, runs on this machine - see app/ai/transcription.py).
+    transcription_provider: str = "openai"
+    local_whisper_model_size: str = "small"
+
     dndbeyond_sync_interval_minutes: int = 15
 
     @property

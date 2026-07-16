@@ -16,11 +16,12 @@ import logging
 import re
 from pathlib import Path
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.ai.transcription import TranscriptionError, transcribe_chunk
+from app.config import Settings
 from app.models import User
+from app.runtime_config import RuntimeConfigStore
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def _speaker_label(discord_id: str, discord_id_to_username: dict[str, str]) -> s
     return username if username is not None else f"Unknown (discord id {discord_id})"
 
 
-def build_session_transcript(session_dir: Path, db: Session, client: OpenAI, whisper_model: str) -> str:
+def build_session_transcript(session_dir: Path, db: Session, settings: "Settings | RuntimeConfigStore") -> str:
     """Transcribes every chunk file under session_dir and returns one
     speaker-tagged transcript, ordered by chunk index.
 
@@ -57,7 +58,7 @@ def build_session_transcript(session_dir: Path, db: Session, client: OpenAI, whi
         for discord_id, path in sorted(chunks_by_index[index]):
             label = _speaker_label(discord_id, discord_id_to_username)
             try:
-                text = transcribe_chunk(path, client, whisper_model).strip()
+                text = transcribe_chunk(path, settings).strip()
             except TranscriptionError as exc:
                 logger.warning("Chunk transcription failed: %s", exc)
                 lines.append(f"[{label}] <transcription failed for this segment>")

@@ -58,12 +58,32 @@ application for it:
 5. In Lorekeeper: **Settings → Discord Bot Token**, paste the token, save. The bot starts
    immediately — no restart needed.
 
-### 3. Add your OpenAI API key
+(This same walkthrough, with clickable links, is also available in-app: **Settings →
+"Don't have a bot yet? Show me how to make one"**.)
 
-Transcription (Whisper) and summaries (GPT-4o) use your own OpenAI account:
-create a key at [platform.openai.com](https://platform.openai.com/api-keys) and paste it
-into **Settings → OpenAI API Key**. You pay OpenAI directly for what you use; a typical
-multi-hour session costs a few dollars in transcription + summarization.
+### 3. Choose transcription and summarization providers
+
+Transcription (turning voice into text) and summarization (turning the transcript into
+GM/player recaps) each have a paid, hosted option and a free, local option — pick either
+independently in **Settings**:
+
+|                | Paid (hosted)                          | Free (local)                                   |
+|----------------|-----------------------------------------|-------------------------------------------------|
+| Transcription  | OpenAI Whisper API                      | [faster-whisper](https://github.com/SYSTRAN/faster-whisper), runs on your CPU |
+| Summarization  | OpenAI GPT-4o                           | [Ollama](https://ollama.com/download), runs on your CPU |
+
+- **OpenAI (either stage):** create a key at
+  [platform.openai.com](https://platform.openai.com/api-keys) and paste it into
+  **Settings → OpenAI API Key**. You pay OpenAI directly for what you use; a typical
+  multi-hour session costs a few dollars in transcription + summarization.
+- **Local Whisper:** pick a model size in **Settings → Transcription** (Small is a good
+  default). No account or setup needed — the model downloads automatically the first
+  time you transcribe a session and is cached on disk afterward. Slower than the API and
+  slightly less accurate, but entirely free and keeps audio on your machine.
+- **Ollama:** install [Ollama](https://ollama.com/download), pull a model from a terminal
+  (e.g. `ollama pull llama3.1`), then select **Ollama** under **Settings → Summarization**.
+  Ollama must be running in the background whenever you summarize a session. Quality
+  depends on the model you pick — a small local model won't match GPT-4o, but it's free.
 
 ### 4. Let players connect
 
@@ -120,8 +140,10 @@ The bot also responds to slash commands in Discord: `/lk_join`, `/lk_leave`,
 Everything is stored locally on the GM's machine under `%APPDATA%\lorekeeper-electron`:
 the SQLite database (`lorekeeper.db`), session recordings (`recordings/`), soundboard
 clips, your settings, and the TLS certificate. Back up that folder to back up your
-campaign. Nothing is uploaded anywhere except audio/transcripts sent to OpenAI when you
-run transcription, and character data fetched from D&D Beyond.
+campaign. Nothing is uploaded anywhere except character data fetched from D&D Beyond,
+and — only if you've selected the OpenAI provider for a given stage — audio/transcripts
+sent to OpenAI for transcription or summarization. Using the local Whisper and Ollama
+providers for both stages keeps all session audio and text on your own machine.
 
 ---
 

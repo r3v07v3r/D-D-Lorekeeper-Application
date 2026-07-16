@@ -1,6 +1,6 @@
 {
   "name": "lorekeeper-electron",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Lorekeeper desktop shell: spawns the bundled Python backend and loads the React dashboard.",
   "author": "R3v07v3R",

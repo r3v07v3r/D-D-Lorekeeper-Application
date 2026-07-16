@@ -36,6 +36,10 @@ EDITABLE_FIELDS = (
     "openai_api_key",
     "whisper_model",
     "summarization_model",
+    "llm_provider",
+    "ollama_base_url",
+    "transcription_provider",
+    "local_whisper_model_size",
     "recording_chunk_minutes",
     "dndbeyond_sync_interval_minutes",
 )

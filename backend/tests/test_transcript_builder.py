@@ -10,8 +10,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import app.ai.transcript_builder as transcript_builder
+from app.config import Settings
 from app.database import Base
 from app.models import User
+
+
+@pytest.fixture
+def settings():
+    return Settings(whisper_model="whisper-1")
 
 
 @pytest.fixture
@@ -39,7 +45,7 @@ def _touch_wav(path: Path) -> None:
         f.writeframes(b"\x00\x00" * 100)
 
 
-def test_orders_by_chunk_index_and_labels_known_and_unknown_speakers(db, monkeypatch, tmp_path):
+def test_orders_by_chunk_index_and_labels_known_and_unknown_speakers(db, settings, monkeypatch, tmp_path):
     session_dir = tmp_path / "session_1"
     session_dir.mkdir()
 
@@ -48,7 +54,7 @@ def test_orders_by_chunk_index_and_labels_known_and_unknown_speakers(db, monkeyp
     _touch_wav(session_dir / "user_222_chunk_0001.wav")
     _touch_wav(session_dir / "user_999_chunk_0001.wav")
 
-    def fake_transcribe_chunk(wav_path, client, model):
+    def fake_transcribe_chunk(wav_path, settings):
         return {
             "user_111_chunk_0000.wav": "Hello, I open the door.",
             "user_222_chunk_0001.wav": "I follow behind.",
@@ -57,7 +63,7 @@ def test_orders_by_chunk_index_and_labels_known_and_unknown_speakers(db, monkeyp
 
     monkeypatch.setattr(transcript_builder, "transcribe_chunk", fake_transcribe_chunk)
 
-    result = transcript_builder.build_session_transcript(session_dir, db, client=None, whisper_model="whisper-1")
+    result = transcript_builder.build_session_transcript(session_dir, db, settings)
 
     lines = result.split("\n")
     assert lines[0] == "[alice] Hello, I open the door."
@@ -66,20 +72,20 @@ def test_orders_by_chunk_index_and_labels_known_and_unknown_speakers(db, monkeyp
     assert "[Unknown (discord id 999)] Who goes there?" in lines[1:]
 
 
-def test_failed_chunk_is_noted_inline_and_does_not_abort(db, monkeypatch, tmp_path):
+def test_failed_chunk_is_noted_inline_and_does_not_abort(db, settings, monkeypatch, tmp_path):
     session_dir = tmp_path / "session_2"
     session_dir.mkdir()
     _touch_wav(session_dir / "user_111_chunk_0000.wav")
     _touch_wav(session_dir / "user_111_chunk_0001.wav")
 
-    def fake_transcribe_chunk(wav_path, client, model):
+    def fake_transcribe_chunk(wav_path, settings):
         if "0000" in wav_path.name:
             raise transcript_builder.TranscriptionError("boom")
         return "second chunk text"
 
     monkeypatch.setattr(transcript_builder, "transcribe_chunk", fake_transcribe_chunk)
 
-    result = transcript_builder.build_session_transcript(session_dir, db, client=None, whisper_model="whisper-1")
+    result = transcript_builder.build_session_transcript(session_dir, db, settings)
 
     assert "<transcription failed for this segment>" in result
     assert "second chunk text" in result
