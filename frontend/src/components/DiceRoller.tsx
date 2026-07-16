@@ -1,12 +1,28 @@
 import { useState } from 'react'
+import { createRoll } from '../api/resources'
 import { rollD20, rollDamage, type D20RollResult, type DamageRollResult } from '../utils/diceEngine'
 
 type Roll = (D20RollResult & { kind: 'd20' }) | (DamageRollResult & { kind: 'damage' })
 
-// Local-only roller (not broadcast to the table yet - that needs a shared
-// roll log, planned for a later phase). 5e RAW: a critical hit doubles the
+function d20Summary(roll: D20RollResult): string {
+  const advantageNote = roll.advantage !== 'normal' ? ` (${roll.advantage})` : ''
+  const modifierNote = roll.modifier !== 0 ? ` ${roll.modifier >= 0 ? '+' : ''}${roll.modifier}` : ''
+  return `d20${advantageNote} [${roll.rolls.join(', ')}]${modifierNote} = ${roll.total}`
+}
+
+function damageSummary(roll: DamageRollResult): string {
+  const critNote = roll.crit ? ' (x2 crit)' : ''
+  const modifierNote = roll.modifier !== 0 ? ` ${roll.modifier >= 0 ? '+' : ''}${roll.modifier}` : ''
+  return `${roll.diceCount}${critNote}d${roll.diceSides}${modifierNote} [${roll.dice.join(', ')}] = ${roll.total}`
+}
+
+// Rolls are broadcast to the shared, campaign-wide roll log (see
+// components/RollLog.tsx and backend/app/routers/rolls.py) in addition to
+// this component's own instant local history - broadcasting is
+// best-effort (fire-and-forget) so a slow/offline connection never blocks
+// seeing your own roll immediately. 5e RAW: a critical hit doubles the
 // number of damage dice, never the flat modifier - see diceEngine.ts.
-export function DiceRoller() {
+export function DiceRoller({ token }: { token: string }) {
   const [modifier, setModifier] = useState(0)
   const [advantage, setAdvantage] = useState<D20RollResult['advantage']>('normal')
   const [diceCount, setDiceCount] = useState(1)
@@ -15,11 +31,15 @@ export function DiceRoller() {
   const [history, setHistory] = useState<Roll[]>([])
 
   function handleRollD20() {
-    setHistory((prev) => [{ ...rollD20(modifier, advantage), kind: 'd20' }, ...prev].slice(0, 20))
+    const roll = rollD20(modifier, advantage)
+    setHistory((prev) => [{ ...roll, kind: 'd20' as const }, ...prev].slice(0, 20))
+    createRoll(token, { summary: d20Summary(roll), total: roll.total }).catch(() => {})
   }
 
   function handleRollDamage() {
-    setHistory((prev) => [{ ...rollDamage(diceCount, diceSides, modifier, crit), kind: 'damage' }, ...prev].slice(0, 20))
+    const roll = rollDamage(diceCount, diceSides, modifier, crit)
+    setHistory((prev) => [{ ...roll, kind: 'damage' as const }, ...prev].slice(0, 20))
+    createRoll(token, { summary: damageSummary(roll), total: roll.total }).catch(() => {})
   }
 
   return (

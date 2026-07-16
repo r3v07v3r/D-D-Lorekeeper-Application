@@ -7,6 +7,7 @@ import { CharacterSheet } from '../components/CharacterSheet'
 import { CharacterIcon, DiceIcon, SessionsIcon } from '../components/icons'
 import { DiceRoller } from '../components/DiceRoller'
 import { NotesPanel } from '../components/NotesPanel'
+import { RollLog } from '../components/RollLog'
 import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
 import { formatDuration } from '../utils/formatDuration'
 import type { CampaignPublic, CharacterPublic, SessionLogPublic } from '../types/api'
@@ -113,7 +114,14 @@ export function PlayerDashboard() {
           </div>
         )}
 
-        {tab === 'dice' && <DiceRoller />}
+        {tab === 'dice' && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <DiceRoller token={token} />
+            </div>
+            <RollLog token={token} />
+          </div>
+        )}
 
         {tab === 'sessions' && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

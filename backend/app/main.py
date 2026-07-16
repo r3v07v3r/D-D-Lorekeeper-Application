@@ -23,7 +23,9 @@ from app.routers import (
     bot_control,
     campaigns,
     characters,
+    encounters,
     notes,
+    rolls,
     sessions,
     settings as settings_router,
     soundboard,
@@ -59,6 +61,8 @@ app.include_router(bot_control.router)
 app.include_router(characters.router)
 app.include_router(settings_router.router)
 app.include_router(soundboard.router)
+app.include_router(encounters.router)
+app.include_router(rolls.router)
 
 
 @app.on_event("startup")

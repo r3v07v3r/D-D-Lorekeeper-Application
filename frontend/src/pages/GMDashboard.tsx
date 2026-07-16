@@ -12,18 +12,20 @@ import {
   processSession,
 } from '../api/resources'
 import { CampaignPicker } from '../components/CampaignPicker'
+import { CombatTracker } from '../components/CombatTracker'
 import { NotesPanel } from '../components/NotesPanel'
 import { BotControlPanel } from '../components/BotControlPanel'
 import { PartyOverview } from '../components/PartyOverview'
+import { RollLog } from '../components/RollLog'
 import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
-import { HomeIcon, LiveIcon, PartyIcon, SessionsIcon, SettingsIcon } from '../components/icons'
+import { CombatIcon, HomeIcon, LiveIcon, PartyIcon, SessionsIcon, SettingsIcon } from '../components/icons'
 import { SettingsPanel } from '../components/SettingsPanel'
 import { SetupBanner } from '../components/SetupBanner'
 import { SoundboardPanel } from '../components/SoundboardPanel'
 import { formatDuration } from '../utils/formatDuration'
 import type { CampaignPublic, PartyMemberPublic, SessionLogPublic, SetupItem, UserPublic } from '../types/api'
 
-type Tab = 'home' | 'sessions' | 'party' | 'bot' | 'soundboard' | 'settings'
+type Tab = 'home' | 'sessions' | 'party' | 'combat' | 'bot' | 'soundboard' | 'settings'
 
 export function GMDashboard() {
   const { token, user } = useAuth()
@@ -229,6 +231,7 @@ export function GMDashboard() {
     { key: 'home', label: 'Home', icon: <HomeIcon /> },
     { key: 'sessions', label: 'Sessions', icon: <SessionsIcon /> },
     { key: 'party', label: 'Party', icon: <PartyIcon /> },
+    { key: 'combat', label: 'Combat', icon: <CombatIcon /> },
     { key: 'bot', label: 'Bot Control', icon: <LiveIcon /> },
     { key: 'soundboard', label: 'Soundboard', icon: <LiveIcon /> },
     { key: 'settings', label: 'Settings', icon: <SettingsIcon />, badge: requiredSetupCount },
@@ -507,6 +510,15 @@ export function GMDashboard() {
         )}
 
         {tab === 'party' && <PartyOverview token={token} />}
+
+        {tab === 'combat' && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <CombatTracker token={token} players={players} />
+            </div>
+            <RollLog token={token} />
+          </div>
+        )}
 
         {tab === 'bot' && <BotControlPanel token={token} activeSessionId={selectedId} />}
 
