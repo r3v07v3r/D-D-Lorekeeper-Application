@@ -56,7 +56,8 @@
       {
         "provider": "github",
         "owner": "R3v07v3R",
-        "repo": "D-D-Lorekeeper-Application"
+        "repo": "D-D-Lorekeeper-Application",
+        "releaseType": "release"
       }
     ]
   }
