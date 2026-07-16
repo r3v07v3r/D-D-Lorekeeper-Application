@@ -187,3 +187,8 @@ class SoundClipPublic(BaseModel):
     name: str
     volume: float
     created_at: datetime
+
+
+class SoundClipAudio(BaseModel):
+    content_base64: str
+    mime_type: str

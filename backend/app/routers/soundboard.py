@@ -1,8 +1,14 @@
-"""GM soundboard: upload/manage short audio clips and play them into the
-Discord voice channel via the bot (see app.bot.controller.play_clip/
-stop_playback). One shared clip library, GM-only throughout - players have
-no reason to trigger or manage these.
+"""GM soundboard: upload/manage short audio clips and play them either into
+the Discord voice channel via the bot (see app.bot.controller.play_clip/
+stop_playback), or locally through this computer's own speakers so a GM
+without a bot configured yet (or who just prefers it) can still cue sound
+effects - the clip plays out loud and rides along on whatever mic/Discord
+call the GM already has open, the same way a GM playing music from a phone
+near an open mic works today, just automated. One shared clip library,
+GM-only throughout - players have no reason to trigger or manage these.
 """
+import base64
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -12,8 +18,8 @@ from app.database import get_db
 from app.models import SoundClip
 from app.routers.bot_control import get_bot_state
 from app.runtime_config import RuntimeConfigStore, get_runtime_config
-from app.schemas import SoundClipPublic, SoundClipUpdate, SoundClipUpload
-from app.soundboard import SoundClipError, decode_clip, delete_clip_file, save_clip_file, validate_extension
+from app.schemas import SoundClipAudio, SoundClipPublic, SoundClipUpdate, SoundClipUpload
+from app.soundboard import MIME_TYPES, SoundClipError, decode_clip, delete_clip_file, save_clip_file, validate_extension
 from app.state import BotState
 
 router = APIRouter(prefix="/soundboard", tags=["soundboard"])
@@ -84,6 +90,31 @@ def delete_clip(
     delete_clip_file(_storage_dir(runtime_config), clip.filename)
     db.delete(clip)
     db.commit()
+
+
+@router.get("/{clip_id}/audio", response_model=SoundClipAudio)
+def get_clip_audio(
+    clip_id: int,
+    db: Session = Depends(get_db),
+    runtime_config: RuntimeConfigStore = Depends(get_runtime_config),
+    _current: SessionRecord = Depends(require_gm),
+) -> SoundClipAudio:
+    """Raw clip bytes for local (non-bot) playback in the renderer - base64
+    in a JSON body rather than a binary response, since the packaged app's
+    requests are proxied through Electron's main process over IPC (see
+    SoundClipUpload's docstring), which only carries string bodies.
+    """
+    clip = db.get(SoundClip, clip_id)
+    if clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such clip")
+    file_path = _storage_dir(runtime_config) / clip.filename
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip file missing on disk")
+    extension = file_path.suffix.lower()
+    return SoundClipAudio(
+        content_base64=base64.b64encode(file_path.read_bytes()).decode("ascii"),
+        mime_type=MIME_TYPES.get(extension, "application/octet-stream"),
+    )
 
 
 @router.post("/{clip_id}/play", status_code=status.HTTP_204_NO_CONTENT)

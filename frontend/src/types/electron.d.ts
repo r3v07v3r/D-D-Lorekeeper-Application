@@ -18,6 +18,7 @@ export interface LorekeeperApiResponse {
 export interface LorekeeperBridge {
   apiRequest: (payload: LorekeeperApiRequest) => Promise<LorekeeperApiResponse>
   trustFingerprint: (hostKey: string, fingerprint: string) => void
+  openBotPanel: () => Promise<void>
 }
 
 declare global {

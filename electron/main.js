@@ -33,6 +33,7 @@ const LOCAL_BACKEND_URL = `https://127.0.0.1:${BACKEND_PORT}`
 
 let backendProcess = null
 let mainWindow = null
+let botPanelWindow = null // detached Bot Control + Soundboard window - see openBotPanelWindow()
 let upnpGateway = null // set if a router mapping succeeds - unmapped on quit
 
 // hostKey ("host:port") -> expected certificate SHA-256 fingerprint, colon-
@@ -334,6 +335,51 @@ ipcMain.on('lorekeeper:trust-fingerprint', (_event, hostKey, fingerprint) => {
   trustedFingerprints.set(hostKey, fingerprint)
 })
 
+// Shared by both the main dashboard window and the detached Bot Control
+// window: external links should always open in the system browser rather
+// than navigating (or silently no-opping in) whichever Lorekeeper window
+// they were clicked in.
+function wireExternalLinkHandling(win) {
+  // target="_blank"/window.open navigation is denied by Electron by default
+  // with no handler configured - without this, links like the Settings
+  // tab's Discord Developer Portal/Ollama docs would silently do nothing.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  // Plain (non-_blank) links to an external http(s) origin would otherwise
+  // navigate this same window away from the dashboard - redirect those to
+  // the system browser too, but only for genuinely external destinations so
+  // this doesn't interfere with loading the app's own dev server/file:// UI.
+  win.webContents.on('will-navigate', (event, url) => {
+    const isOwnFrontend = app.isPackaged
+      ? url.startsWith('file://')
+      : url.startsWith('http://127.0.0.1:5173')
+    if (!isOwnFrontend && (url.startsWith('http://') || url.startsWith('https://'))) {
+      event.preventDefault()
+      shell.openExternal(url)
+    }
+  })
+}
+
+// Loads the app's own frontend into `win`, at the given HashRouter route
+// (e.g. "/bot-panel"). Both packaged (file://) and dev (Vite dev server)
+// modes need the hash appended after the load target resolves, not baked
+// into frontendIndexPath()/the dev URL string, since loadFile's own `hash`
+// option is the correct way to set a fragment on a file:// load.
+async function loadFrontend(win, route) {
+  if (app.isPackaged) {
+    await win.loadFile(frontendIndexPath(), route ? { hash: route } : undefined)
+  } else {
+    // Vite dev server, started separately (see repo-root .claude/launch.json
+    // or `npm run dev` in frontend/).
+    await win.loadURL(`http://127.0.0.1:5173${route ? `/#${route}` : ''}`)
+  }
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -352,43 +398,48 @@ async function createWindow() {
     },
   })
 
-  // The dashboard's Settings tab links out to real docs (Discord Developer
-  // Portal, Ollama). Electron denies target="_blank"/window.open navigation
-  // by default with no handler configured, so without this those links would
-  // silently do nothing instead of opening the system browser.
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      shell.openExternal(url)
-    }
-    return { action: 'deny' }
-  })
-
-  // Plain (non-_blank) links to an external http(s) origin would otherwise
-  // navigate this same window away from the dashboard - redirect those to
-  // the system browser too, but only for genuinely external destinations so
-  // this doesn't interfere with loading the app's own dev server/file:// UI.
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    const isOwnFrontend = app.isPackaged
-      ? url.startsWith('file://')
-      : url.startsWith('http://127.0.0.1:5173')
-    if (!isOwnFrontend && (url.startsWith('http://') || url.startsWith('https://'))) {
-      event.preventDefault()
-      shell.openExternal(url)
-    }
-  })
-
-  if (app.isPackaged) {
-    await mainWindow.loadFile(frontendIndexPath())
-  } else {
-    // Vite dev server, started separately (see repo-root .claude/launch.json
-    // or `npm run dev` in frontend/).
-    await mainWindow.loadURL('http://127.0.0.1:5173')
-  }
+  wireExternalLinkHandling(mainWindow)
+  await loadFrontend(mainWindow)
 
   mainWindow.on('closed', () => {
     mainWindow = null
   })
 }
+
+// Opens (or focuses, if already open) a small second window showing just Bot
+// Control + Soundboard, so a GM can keep it visible (e.g. on a second
+// monitor) while navigating the main dashboard elsewhere. A real second
+// BrowserWindow rather than an in-app panel, sharing this app's default
+// session - localStorage (and so the GM's logged-in session, see
+// AuthContext.tsx) is keyed by origin, not by window, so no separate login
+// is needed here.
+async function openBotPanelWindow() {
+  if (botPanelWindow) {
+    botPanelWindow.focus()
+    return
+  }
+
+  botPanelWindow = new BrowserWindow({
+    width: 420,
+    height: 640,
+    title: 'Lorekeeper - Bot Control',
+    icon: app.isPackaged ? undefined : path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  wireExternalLinkHandling(botPanelWindow)
+  await loadFrontend(botPanelWindow, '/bot-panel')
+
+  botPanelWindow.on('closed', () => {
+    botPanelWindow = null
+  })
+}
+
+ipcMain.handle('lorekeeper:open-bot-panel', () => openBotPanelWindow())
 
 app.whenReady().then(async () => {
   // Checked first, before spinning up the backend: if the GM chooses to

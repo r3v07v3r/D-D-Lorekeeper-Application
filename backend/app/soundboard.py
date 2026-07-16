@@ -9,6 +9,18 @@ from pathlib import Path
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
 MAX_CLIP_BYTES = 8 * 1024 * 1024  # 8MB - generous for a short sound effect
 
+# For local (non-bot) playback in the renderer - see
+# app/routers/soundboard.py:get_clip_audio. m4a's actual container is MP4
+# audio; "audio/mp4" is the widely-supported HTML5 <audio> MIME type for it,
+# not "audio/m4a" (not a registered type browsers reliably recognize).
+MIME_TYPES = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".m4a": "audio/mp4",
+    ".flac": "audio/flac",
+}
+
 
 class SoundClipError(Exception):
     """Raised for any invalid upload (bad extension, too large, corrupt

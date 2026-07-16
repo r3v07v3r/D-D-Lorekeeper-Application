@@ -16,8 +16,11 @@ Lorekeeper is a standalone, independent application. It is not affiliated with, 
 by, or sponsored by D&D Beyond, Wizards of the Coast, or Hasbro. The optional D&D Beyond
 sync described below only reads data for characters you already have access to in your
 own account - Lorekeeper doesn't store, redistribute, or claim ownership of any D&D Beyond
-or Dungeons & Dragons content, and works fully without it if you'd rather build characters
-by hand. "D&D Beyond" and "Dungeons & Dragons" are trademarks of their respective owners.
+or Dungeons & Dragons content. Session recording, transcription, summaries, notes, and the
+soundboard all work with no D&D Beyond account at all; only the live character sheet (HP,
+AC, passive perception, inventory) currently depends on it, and manual character entry is
+planned for a future release. "D&D Beyond" and "Dungeons & Dragons" are trademarks of their
+respective owners.
 
 ---
 
