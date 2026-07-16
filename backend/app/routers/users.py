@@ -16,7 +16,7 @@ further accounts additionally requires an authenticated GM session.
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import get_session_store, require_network_access
+from app.auth import SessionRecord, get_current_user, get_session_store, require_network_access
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserPublic
@@ -27,6 +27,21 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("", response_model=list[UserPublic], dependencies=[Depends(require_network_access)])
 def list_users(db: Session = Depends(get_db)) -> list[User]:
     return db.query(User).order_by(User.id).all()
+
+
+@router.get("/presence")
+def get_presence(
+    request: Request,
+    db: Session = Depends(get_db),
+    _current: SessionRecord = Depends(get_current_user),
+) -> dict[int, bool]:
+    """Which users currently have a live Lorekeeper session - see
+    SessionStore.connected_user_ids(). This is app-level connectivity, not
+    Discord voice presence (there is no bot-side hook for that yet), and
+    powers the sidebar's grey/lit party avatars.
+    """
+    connected = get_session_store(request).connected_user_ids()
+    return {user.id: user.id in connected for user in db.query(User).all()}
 
 
 @router.post(

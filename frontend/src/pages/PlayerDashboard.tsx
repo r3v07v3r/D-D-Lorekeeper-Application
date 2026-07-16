@@ -2,10 +2,17 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { getMyCharacter, listSessions } from '../api/resources'
 import { CharacterSheet } from '../components/CharacterSheet'
+import { CharacterIcon, SessionsIcon } from '../components/icons'
 import { NotesPanel } from '../components/NotesPanel'
+import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
 import type { CharacterPublic, SessionLogPublic } from '../types/api'
 
 type Tab = 'character' | 'sessions'
+
+const NAV_ITEMS: SidebarNavItem[] = [
+  { key: 'character', label: 'My Character', icon: <CharacterIcon /> },
+  { key: 'sessions', label: 'Session Recaps', icon: <SessionsIcon /> },
+]
 
 export function PlayerDashboard() {
   const { token, user } = useAuth()
@@ -31,72 +38,62 @@ export function PlayerDashboard() {
   const selected = sessions.find((s) => s.id === selectedId) ?? null
 
   return (
-    <div className="space-y-4">
-      <nav className="flex gap-2 border-b border-slate-800">
-        {(['character', 'sessions'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-3 py-2 text-sm font-medium capitalize ${
-              tab === t ? 'border-b-2 border-indigo-500 text-slate-100' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {t === 'character' ? 'My Character' : 'Session Recaps'}
-          </button>
-        ))}
-      </nav>
+    <div className="flex gap-4">
+      <Sidebar navItems={NAV_ITEMS} active={tab} onSelect={(key) => setTab(key as Tab)} />
 
-      {tab === 'character' && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-          {character ? (
-            <CharacterSheet character={character} />
-          ) : (
-            <p className="text-sm text-slate-500">{characterError ?? 'Loading your character...'}</p>
-          )}
-        </div>
-      )}
-
-      {tab === 'sessions' && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <ul className="space-y-1 lg:col-span-1">
-            {sessions.map((s) => (
-              <li key={s.id}>
-                <button
-                  onClick={() => setSelectedId(s.id)}
-                  className={`w-full rounded-md px-3 py-2 text-left text-sm ${
-                    selectedId === s.id ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-900'
-                  }`}
-                >
-                  <div className="font-medium">
-                    {s.campaign_name} - Session {s.session_number}
-                  </div>
-                  <div className="text-xs text-slate-500">{s.date}</div>
-                </button>
-              </li>
-            ))}
-            {sessions.length === 0 && <p className="text-sm text-slate-500">No sessions yet.</p>}
-          </ul>
-
-          <div className="lg:col-span-2">
-            {selected ? (
-              <div className="space-y-4 rounded-lg border border-slate-800 bg-slate-900 p-4">
-                <h3 className="text-lg font-semibold text-slate-100">
-                  {selected.campaign_name} - Session {selected.session_number}
-                </h3>
-                <div>
-                  <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Recap</h4>
-                  <p className="whitespace-pre-wrap text-sm text-slate-300">
-                    {selected.player_summary ?? 'Not available yet - ask your GM to process this session.'}
-                  </p>
-                </div>
-                <NotesPanel token={token} sessionId={selected.id} role="player" players={[]} />
-              </div>
+      <div className="min-w-0 flex-1 space-y-4">
+        {tab === 'character' && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+            {character ? (
+              <CharacterSheet character={character} />
             ) : (
-              <p className="text-sm text-slate-500">Select a session to see its recap.</p>
+              <p className="text-sm text-[var(--text-faint)]">{characterError ?? 'Loading your character...'}</p>
             )}
           </div>
-        </div>
-      )}
+        )}
+
+        {tab === 'sessions' && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <ul className="space-y-1 lg:col-span-1">
+              {sessions.map((s) => (
+                <li key={s.id}>
+                  <button
+                    onClick={() => setSelectedId(s.id)}
+                    className={`w-full rounded-md px-3 py-2 text-left text-sm ${
+                      selectedId === s.id ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-muted)] hover:bg-[var(--surface)]'
+                    }`}
+                  >
+                    <div className="font-medium">
+                      {s.campaign_name} - Session {s.session_number}
+                    </div>
+                    <div className="text-xs text-[var(--text-faint)]">{s.date}</div>
+                  </button>
+                </li>
+              ))}
+              {sessions.length === 0 && <p className="text-sm text-[var(--text-faint)]">No sessions yet.</p>}
+            </ul>
+
+            <div className="lg:col-span-2">
+              {selected ? (
+                <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <h3 className="text-lg font-semibold text-[var(--text)]">
+                    {selected.campaign_name} - Session {selected.session_number}
+                  </h3>
+                  <div>
+                    <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--text-faint)]">Recap</h4>
+                    <p className="whitespace-pre-wrap text-sm text-[var(--text-muted)]">
+                      {selected.player_summary ?? 'Not available yet - ask your GM to process this session.'}
+                    </p>
+                  </div>
+                  <NotesPanel token={token} sessionId={selected.id} role="player" players={[]} />
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--text-faint)]">Select a session to see its recap.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

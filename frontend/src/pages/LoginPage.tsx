@@ -64,21 +64,21 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-slate-950 px-4">
-      <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
-        <h1 className="mb-1 text-2xl font-semibold text-slate-100">Lorekeeper</h1>
-        <p className="mb-4 text-sm text-slate-400">Choose your profile to continue.</p>
+    <div className="flex min-h-full items-center justify-center bg-[var(--bg)] px-4">
+      <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-xl">
+        <h1 className="mb-1 text-2xl font-semibold text-[var(--text)]">Lorekeeper</h1>
+        <p className="mb-4 text-sm text-[var(--text-muted)]">Choose your profile to continue.</p>
 
         <ServerConnect onChanged={refreshUsers} />
 
         {error && (
-          <div className="mb-4 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-300">
+          <div className="mb-4 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
             {error}
           </div>
         )}
 
         {loading ? (
-          <p className="text-sm text-slate-500">Loading profiles...</p>
+          <p className="text-sm text-[var(--text-faint)]">Loading profiles...</p>
         ) : error ? null : users.length > 0 ? (
           <ul className="space-y-2">
             {users.map((user) => (
@@ -86,10 +86,10 @@ export function LoginPage() {
                 <button
                   onClick={() => handleSelect(user)}
                   disabled={busyUserId !== null}
-                  className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-800/50 px-4 py-3 text-left transition hover:border-indigo-500 hover:bg-slate-800 disabled:opacity-50"
+                  className="flex w-full items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface-2)]/50 px-4 py-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--surface-2)] disabled:opacity-50"
                 >
-                  <span className="font-medium text-slate-100">{user.username}</span>
-                  <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-300">
+                  <span className="font-medium text-[var(--text)]">{user.username}</span>
+                  <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs uppercase tracking-wide text-[var(--text-muted)]">
                     {user.role}
                   </span>
                 </button>
@@ -98,23 +98,23 @@ export function LoginPage() {
           </ul>
         ) : (
           <form onSubmit={handleBootstrapGm} className="space-y-3">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-[var(--text-muted)]">
               No profiles exist yet. Create the first one - it becomes the GM.
             </p>
             <input
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
               placeholder="GM username"
-              className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[var(--text)] placeholder-[var(--text-faint)] focus:border-[var(--accent)] focus:outline-none"
             />
             <button
               type="submit"
               disabled={creating || !newUsername.trim()}
-              className="w-full rounded-md bg-indigo-600 px-3 py-2 font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+              className="w-full rounded-md bg-[var(--accent)] px-3 py-2 font-medium text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-50"
             >
               {creating ? 'Creating...' : 'Create GM profile'}
             </button>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--text-faint)]">
               After logging in, add your players from the Party tab. They can join from their own
               computer using "Joining someone else's game?" above.
             </p>

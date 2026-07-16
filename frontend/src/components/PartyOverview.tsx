@@ -63,58 +63,58 @@ export function PartyOverview({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-100">Party Overview</h3>
+        <h3 className="text-lg font-semibold text-[var(--text)]">Party Overview</h3>
         <button
           onClick={handleSync}
           disabled={syncing}
-          className="rounded-md border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--surface-2)] disabled:opacity-50"
         >
           {syncing ? 'Syncing...' : 'Sync from D&D Beyond'}
         </button>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
-      <form onSubmit={handleAddPlayer} className="flex flex-wrap gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+      <form onSubmit={handleAddPlayer} className="flex flex-wrap gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Player username"
-          className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+          className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)]"
         />
         <input
           value={discordId}
           onChange={(e) => setDiscordId(e.target.value)}
           placeholder="Discord user ID (optional)"
-          className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+          className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)]"
         />
         <input
           value={characterId}
           onChange={(e) => setCharacterId(e.target.value)}
           placeholder="D&D Beyond character ID (optional)"
-          className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+          className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)]"
         />
         <button
           type="submit"
           disabled={adding || !username.trim()}
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           Add player
         </button>
       </form>
 
       {party.length === 0 ? (
-        <p className="text-sm text-slate-500">No players registered yet.</p>
+        <p className="text-sm text-[var(--text-faint)]">No players registered yet.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {party.map((member) => (
-            <div key={member.user_id} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+            <div key={member.user_id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
               {member.character ? (
                 <CharacterSheet character={member.character} />
               ) : (
                 <div>
-                  <h4 className="font-medium text-slate-100">{member.username}</h4>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <h4 className="font-medium text-[var(--text)]">{member.username}</h4>
+                  <p className="mt-1 text-sm text-[var(--text-faint)]">
                     {member.sync_error ?? 'No D&D Beyond character linked.'}
                   </p>
                 </div>

@@ -21,6 +21,10 @@ export const createPlayer = (
   token: string,
   payload: { username: string; discord_id: string | null; dnd_beyond_character_id: string | null },
 ) => api.post<UserPublic>('/users', { ...payload, role: 'player' }, token)
+// Keyed by user id as a string - JSON object keys are always strings, even
+// though the backend's response_model is dict[int, bool] (see
+// backend/app/routers/users.py:get_presence).
+export const getUserPresence = (token: string) => api.get<Record<string, boolean>>('/users/presence', token)
 
 export const listSessions = (token: string) => api.get<SessionLogPublic[]>('/sessions', token)
 export const getSession = (token: string, id: number) => api.get<SessionLogPublic>(`/sessions/${id}`, token)

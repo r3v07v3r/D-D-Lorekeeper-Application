@@ -10,6 +10,7 @@ GM-only, and now passphrase-gated too - see app.auth.require_network_access)
 doesn't expose the actual value.
 """
 import os
+import time
 
 import httpx
 from fastapi import APIRouter, Depends, Request
@@ -24,18 +25,37 @@ from app.state import BotState
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
+# Mirrors app/netinfo.py's _public_ip_cache pattern: without this, every GET
+# /settings call with Ollama selected paid a synchronous (up to 1.5s) network
+# round trip - and the frontend was calling this on every tab change anywhere
+# in the app (see GMDashboard.tsx), not just while Settings was open, making
+# ordinary navigation feel slow. Ollama's up/down state doesn't change
+# request-to-request, so a short TTL is enough to make that cost disappear
+# without masking a real state change for more than a few seconds.
+_OLLAMA_CACHE_TTL_SECONDS = 30
+_ollama_reachable_cache: dict[str, tuple[float, bool]] = {}
+
 
 def _check_ollama_reachable(base_url: str) -> bool:
     """A bare TCP connect wouldn't distinguish "Ollama" from anything else
     listening on that port, so this hits its OpenAI-compatible /models
-    endpoint instead. Short timeout since this runs synchronously on every
-    Settings page load whenever Ollama is the selected provider.
+    endpoint instead. Cached per base_url so a GM flipping between the
+    Settings sub-tabs (or just using the rest of the app) doesn't re-pay this
+    network cost on every request.
     """
+    now = time.monotonic()
+    cached = _ollama_reachable_cache.get(base_url)
+    if cached is not None and now - cached[0] < _OLLAMA_CACHE_TTL_SECONDS:
+        return cached[1]
+
     try:
         response = httpx.get(f"{base_url.rstrip('/')}/models", timeout=1.5)
-        return response.status_code == 200
+        reachable = response.status_code == 200
     except httpx.HTTPError:
-        return False
+        reachable = False
+
+    _ollama_reachable_cache[base_url] = (now, reachable)
+    return reachable
 
 
 def _compute_setup_items(config: RuntimeConfigStore) -> list[SetupItem]:
