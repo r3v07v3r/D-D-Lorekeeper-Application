@@ -1,18 +1,30 @@
-# Runs on every push to main, but only actually builds/publishes when
-# electron/package.json's version doesn't already have a matching GitHub
-# release - bumping that version is what signals "this push is a release",
-# same as the manual process this replaces (see README). Pushes that don't
-# bump it (docs, CI tweaks, etc.) are a fast no-op instead of failing on a
-# duplicate release.
+# Runs on every push to main. Every merge gets its own released version,
+# auto-incremented rather than requiring someone to hand-edit
+# electron/package.json before merging:
+#   - If the committed version doesn't have a GitHub release yet, this is
+#     a version bumped intentionally ahead of time (or the very first
+#     release) - build and publish it as-is.
+#   - If it already has a release, this merge needs a new version: bump it
+#     (patch by default) and push that bump straight to main. Pushing
+#     re-triggers this workflow; that second run sees the freshly bumped
+#     version has no release yet and proceeds straight to building it -
+#     so bumping never also builds in the same run (which would race
+#     against the build the bump's own push triggers) and there's no
+#     infinite loop (a version is only ever bumped once, the run right
+#     after always finds no release for it yet).
+#   - The bump defaults to patch. Include "[minor]" or "[major]" anywhere
+#     in the merge commit message (e.g. in the PR title, since that's what
+#     `gh pr merge --merge` carries into the merge commit) to bump that
+#     part of semver instead.
 #
 # electron/package.json's build.publish.releaseType is deliberately set to
 # "release" (electron-builder's default is "draft"). A draft doesn't create
 # a real git tag until someone manually publishes it, which would silently
-# break both this dedup check (next push wouldn't see the version as
-# released and would rebuild/republish it) and the app's auto-updater
-# (which only looks at the latest *published* release) - learned the hard
-# way when the first real run of this workflow left v1.2.0 sitting
-# unpublished with no tag.
+# break both the "already released" check above (next push wouldn't see the
+# version as released and would rebuild/republish it) and the app's
+# auto-updater (which only looks at the latest *published* release) -
+# learned the hard way when the first real run of this workflow left
+# v1.2.0 sitting unpublished with no tag.
 name: Build and release
 
 on:
@@ -35,14 +47,36 @@ jobs:
       - id: check
         run: |
           VERSION=$(node -p "require('./electron/package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
           if git ls-remote --tags origin | grep -q "refs/tags/v$VERSION\$"; then
-            echo "Release v$VERSION already exists - skipping build."
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            if echo "$COMMIT_MSG" | grep -qi '\[major\]'; then
+              BUMP=major
+            elif echo "$COMMIT_MSG" | grep -qi '\[minor\]'; then
+              BUMP=minor
+            else
+              BUMP=patch
+            fi
+
+            echo "v$VERSION is already released - bumping ($BUMP) for this merge."
+            (cd electron && npm version "$BUMP" --no-git-tag-version)
+            VERSION=$(node -p "require('./electron/package.json').version")
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add electron/package.json electron/package-lock.json
+            git commit -m "chore(release): bump version to v$VERSION"
+            git push
+
+            # This run's job is only to bump - the push above triggers a
+            # fresh run that builds the now-unreleased bumped version.
             echo "should_release=false" >> "$GITHUB_OUTPUT"
           else
-            echo "No release for v$VERSION yet - building."
+            echo "No release for v$VERSION yet - building this version."
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   build-and-release:
     needs: check-version
