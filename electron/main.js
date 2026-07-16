@@ -17,6 +17,10 @@
 // never silently downgraded to "trust anything".
 const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron')
 const { autoUpdater } = require('electron-updater')
+// Downloading must wait for explicit GM consent (see checkForUpdatesAndPrompt
+// below) - the default of true would fetch the update in the background
+// before anyone agreed to install it.
+autoUpdater.autoDownload = false
 const path = require('node:path')
 const fs = require('node:fs')
 const https = require('node:https')
@@ -177,6 +181,63 @@ async function checkFfmpegAndPrompt() {
   }
 }
 
+// Update checks must never hang app startup indefinitely if GitHub is
+// unreachable (offline GM, flaky connection, corporate proxy, etc.) - races
+// the check against a plain timeout and treats a timeout the same as "no
+// update available" rather than blocking the GM out of their own app.
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_resolve, reject) => setTimeout(() => reject(new Error('timed out')), ms)),
+  ])
+}
+
+// Checks GitHub Releases for a newer version and, if one exists, lets the GM
+// choose whether to update now (download + restart into the new version) or
+// continue with the currently installed one - never silently auto-installs.
+// autoDownload is disabled (see app.whenReady below) specifically so nothing
+// downloads before the GM has agreed to it.
+async function checkForUpdatesAndPrompt() {
+  if (!app.isPackaged) return // no update feed in dev (unpackaged) builds
+
+  let updateInfo
+  try {
+    const result = await withTimeout(autoUpdater.checkForUpdates(), 10_000)
+    updateInfo = result && result.updateInfo
+  } catch (err) {
+    console.warn('[updater] check failed, continuing without update:', err)
+    return
+  }
+  if (!updateInfo || updateInfo.version === app.getVersion()) return
+
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    title: 'Update available',
+    message: `Lorekeeper ${updateInfo.version} is available (you have ${app.getVersion()}).`,
+    detail:
+      'Update now to restart with the latest version, or continue with the current version - ' +
+      "you'll be asked again next time you launch the app.",
+    buttons: ['Update Now', 'Not Now'],
+    defaultId: 0,
+    cancelId: 1,
+  })
+
+  if (response !== 0) return // "Not Now" - launch as-is
+
+  try {
+    await withTimeout(autoUpdater.downloadUpdate(), 5 * 60_000)
+  } catch (err) {
+    dialog.showErrorBox(
+      'Update failed',
+      `Could not download the update: ${err.message || err}\n\nContinuing with the current version.`,
+    )
+    return
+  }
+  // Quits and relaunches into the downloaded version - anything after this
+  // call in app.whenReady never runs for this launch.
+  autoUpdater.quitAndInstall()
+}
+
 // Best-effort automatic router port-forwarding for internet play, so the GM
 // doesn't have to open their router's admin page and configure this by
 // hand (see the Settings tab, which always shows the manual steps too -
@@ -330,6 +391,10 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Checked first, before spinning up the backend: if the GM chooses to
+  // update, quitAndInstall() ends the process here and nothing below runs.
+  await checkForUpdatesAndPrompt()
+
   startBackend()
 
   await checkFfmpegAndPrompt()
@@ -346,10 +411,6 @@ app.whenReady().then(async () => {
   attemptUpnpPortMapping(BACKEND_PORT).catch((err) => console.warn('[upnp] unexpected error:', err))
 
   await createWindow()
-
-  if (app.isPackaged) {
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => console.error('[updater]', err))
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

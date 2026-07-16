@@ -30,11 +30,20 @@ computers and connect to the GM with a one-line **share code**.
    Then restart Lorekeeper. The app checks for ffmpeg at every launch and will point you
    at a download page if it's missing.
 
-The app auto-updates from GitHub Releases when a newer version is published.
+On launch, the app checks GitHub Releases for a newer version. If one is available, you'll
+be asked whether to update now (downloads and restarts into the new version) or continue
+with the version you have - it never updates without asking, and if you say not now you'll
+just be asked again next launch.
 
 ---
 
 ## GM setup (one time)
+
+Every screen but Settings shows a **setup banner** listing anything that still needs
+configuring (Discord bot token, an AI provider, etc.) with a one-click link straight to
+the right field - use it as a checklist rather than working through this section blind.
+Optional items (like a campaign passphrase, only needed to play with others) are called
+out separately from the ones that actually block core features.
 
 ### 1. Create your profile
 
@@ -175,7 +184,17 @@ Database migrations use Alembic (`backend/migrations/`). After changing models:
 `venv/Scripts/alembic revision --autogenerate -m "describe change"` — migrations run
 automatically at app startup, including inside the packaged build.
 
-Release build:
+### Releasing
+
+Releases are built and published automatically by
+[`.github/workflows/release.yml`](.github/workflows/release.yml): every push to `main`
+checks whether `electron/package.json`'s `version` already has a matching GitHub release,
+and if not, runs the backend tests, builds the backend exe + frontend + installer, and
+publishes a new release with the installer, `latest.yml`, and `.blockmap` attached (what
+the app's auto-updater reads). **Bumping that version is what triggers a release** -
+pushes that don't touch it (docs, CI tweaks, etc.) are a no-op.
+
+To build a release locally instead (e.g. to test packaging changes before pushing):
 
 ```bash
 cd backend  && venv/Scripts/pip install -r requirements-build.txt && venv/Scripts/python build_backend.py
@@ -183,6 +202,4 @@ cd frontend && npm run build
 cd electron && npx electron-builder --win nsis
 ```
 
-The installer lands in `electron/dist/`. Bump `version` in `electron/package.json`
-before building a release, and attach the installer **plus `latest.yml` and the
-`.blockmap` file** to the GitHub release so auto-update works.
+The installer lands in `electron/dist/`.
