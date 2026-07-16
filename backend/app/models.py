@@ -1,8 +1,8 @@
-"""SQLAlchemy models: Users, SessionLogs, Notes, SoundClips."""
+"""SQLAlchemy models: Users, SessionLogs, Notes, SoundClips, Characters."""
 from datetime import date as date_type
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -105,6 +105,60 @@ class Note(Base):
     session: Mapped["SessionLog"] = relationship(back_populates="notes")
     author: Mapped["User"] = relationship(foreign_keys=[author_id])
     target_player: Mapped["User | None"] = relationship(foreign_keys=[target_player_id])
+
+
+class Character(Base):
+    """One character per user, populated by *either* manual entry or D&D
+    Beyond sync (see app/dndbeyond/sync.py) - both paths write the same
+    columns so the rest of the app (character sheet, party overview) never
+    needs to care which source a given character came from. Deliberately
+    lean, not a full reimplementation of D&D Beyond's data model: ability
+    modifiers are derived from ability_scores at read time (see
+    app/routers/characters.py) rather than stored, so there's exactly one
+    source of truth for them.
+    """
+
+    __tablename__ = "characters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
+    # "manual" (player-entered) or "dndbeyond" (last written by a sync) - see
+    # app/routers/characters.py:update_my_character for why a linked
+    # character can't also be hand-edited (sync would just overwrite it).
+    source: Mapped[str] = mapped_column(String, nullable=False)
+
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    race: Mapped[str] = mapped_column(String, nullable=False, default="")
+    classes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    level: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    proficiency_bonus: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    ability_scores: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+    hp_current: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    hp_max: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    hp_temp: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    armor_class: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    armor_class_is_estimate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    passive_perception: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    passive_perception_is_estimate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    currencies: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # [{"name": str, "quantity": int, "equipped": bool}, ...]
+    inventory: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # {"1": {"current": int, "max": int}, ..., "9": {...}} - only levels the
+    # character actually has slots at need an entry. Freeform, not a full
+    # SRD spell list/slot-progression table (kept lean, per project scope).
+    spell_slots: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # [{"name": str, "level": int, "description": str}, ...] - level 0 = cantrip.
+    known_spells: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship()
 
 
 class SoundClip(Base):

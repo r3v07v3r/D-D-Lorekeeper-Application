@@ -5,6 +5,7 @@ import { api } from './client'
 import type {
   BotStatusResponse,
   CampaignPublic,
+  CharacterInput,
   CharacterPublic,
   NotePublic,
   PartyMemberPublic,
@@ -57,6 +58,9 @@ export const createNote = (
 ) => api.post<NotePublic>(`/sessions/${sessionId}/notes`, payload, token)
 
 export const getMyCharacter = (token: string) => api.get<CharacterPublic>('/characters/me', token)
+export const updateMyCharacter = (token: string, payload: CharacterInput) =>
+  api.put<CharacterPublic>('/characters/me', payload, token)
+export const restCharacter = (token: string) => api.post<CharacterPublic>('/characters/me/rest', undefined, token)
 export const getPartyOverview = (token: string) => api.get<PartyMemberPublic[]>('/characters/party', token)
 export const triggerCharacterSync = (token: string) =>
   api.post<{ status: string }>('/characters/sync', undefined, token)
