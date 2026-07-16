@@ -1,34 +1,38 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { ApiError } from '../api/client'
 import { getActiveCampaign, getMyCharacter, listSessions } from '../api/resources'
+import { CharacterEditor } from '../components/CharacterEditor'
 import { CharacterSheet } from '../components/CharacterSheet'
-import { CharacterIcon, SessionsIcon } from '../components/icons'
+import { CharacterIcon, DiceIcon, SessionsIcon } from '../components/icons'
+import { DiceRoller } from '../components/DiceRoller'
 import { NotesPanel } from '../components/NotesPanel'
 import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
 import { formatDuration } from '../utils/formatDuration'
 import type { CampaignPublic, CharacterPublic, SessionLogPublic } from '../types/api'
 
-type Tab = 'character' | 'sessions'
+type Tab = 'character' | 'dice' | 'sessions'
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { key: 'character', label: 'My Character', icon: <CharacterIcon /> },
+  { key: 'dice', label: 'Dice Roller', icon: <DiceIcon /> },
   { key: 'sessions', label: 'Session Recaps', icon: <SessionsIcon /> },
 ]
 
 export function PlayerDashboard() {
   const { token, user } = useAuth()
   const [tab, setTab] = useState<Tab>('character')
-  const [character, setCharacter] = useState<CharacterPublic | null>(null)
+  // undefined = loading; null = confirmed no character yet (404); else the character.
+  const [character, setCharacter] = useState<CharacterPublic | null | undefined>(undefined)
   const [characterError, setCharacterError] = useState<string | null>(null)
+  const [editingCharacter, setEditingCharacter] = useState(false)
   const [sessions, setSessions] = useState<SessionLogPublic[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [campaign, setCampaign] = useState<CampaignPublic | null>(null)
 
   useEffect(() => {
     if (!token) return
-    getMyCharacter(token)
-      .then(setCharacter)
-      .catch((err) => setCharacterError(err instanceof Error ? err.message : 'No character linked.'))
+    refreshCharacter()
     listSessions(token).then((logs) => {
       setSessions(logs)
       if (logs.length > 0) setSelectedId(logs[logs.length - 1].id)
@@ -37,6 +41,22 @@ export function PlayerDashboard() {
       .then(setCampaign)
       .catch(() => {})
   }, [token])
+
+  function refreshCharacter() {
+    if (!token) return
+    getMyCharacter(token)
+      .then((c) => {
+        setCharacter(c)
+        setCharacterError(null)
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setCharacter(null)
+        } else {
+          setCharacterError(err instanceof Error ? err.message : 'Could not load your character.')
+        }
+      })
+  }
 
   if (!token || !user) return null
 
@@ -61,13 +81,39 @@ export function PlayerDashboard() {
         <div className="min-w-0 flex-1 space-y-4">
         {tab === 'character' && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
-            {character ? (
-              <CharacterSheet character={character} />
+            {character === undefined ? (
+              <p className="text-sm text-[var(--text-faint)]">Loading your character...</p>
+            ) : characterError ? (
+              <p className="text-sm text-[var(--danger)]">{characterError}</p>
+            ) : character === null || editingCharacter ? (
+              <CharacterEditor
+                token={token}
+                character={character}
+                onSaved={(saved) => {
+                  setCharacter(saved)
+                  setEditingCharacter(false)
+                }}
+                onCancel={character ? () => setEditingCharacter(false) : undefined}
+              />
             ) : (
-              <p className="text-sm text-[var(--text-faint)]">{characterError ?? 'Loading your character...'}</p>
+              <div className="space-y-3">
+                {character.source === 'manual' && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setEditingCharacter(true)}
+                      className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)]"
+                    >
+                      Edit character
+                    </button>
+                  </div>
+                )}
+                <CharacterSheet character={character} editable token={token} onUpdated={setCharacter} />
+              </div>
             )}
           </div>
         )}
+
+        {tab === 'dice' && <DiceRoller />}
 
         {tab === 'sessions' && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

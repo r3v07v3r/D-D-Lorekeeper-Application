@@ -52,7 +52,19 @@ export interface InventoryItemPublic {
   equipped: boolean
 }
 
+export interface SpellSlotInfo {
+  current: number
+  max: number
+}
+
+export interface KnownSpell {
+  name: string
+  level: number // 0 = cantrip
+  description: string
+}
+
 export interface CharacterPublic {
+  source: 'manual' | 'dndbeyond'
   character_id: string
   name: string
   race: string
@@ -70,6 +82,27 @@ export interface CharacterPublic {
   passive_perception_is_estimate: boolean
   currencies: Record<string, number>
   inventory: InventoryItemPublic[]
+  spell_slots: Record<string, SpellSlotInfo>
+  known_spells: KnownSpell[]
+}
+
+// Manual character create/edit payload - see backend/app/routers/characters.py:CharacterInput.
+export interface CharacterInput {
+  name: string
+  race: string
+  classes: string[]
+  level: number
+  proficiency_bonus: number
+  ability_scores: Record<string, number>
+  hp_current: number
+  hp_max: number
+  hp_temp: number
+  armor_class: number
+  passive_perception: number
+  currencies: Record<string, number>
+  inventory: InventoryItemPublic[]
+  spell_slots: Record<string, SpellSlotInfo>
+  known_spells: KnownSpell[]
 }
 
 export interface PartyMemberPublic {
