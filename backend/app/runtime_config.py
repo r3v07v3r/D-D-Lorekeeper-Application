@@ -42,6 +42,7 @@ EDITABLE_FIELDS = (
     "local_whisper_model_size",
     "recording_chunk_minutes",
     "dndbeyond_sync_interval_minutes",
+    "active_campaign_id",
 )
 
 # Fields containing secrets - never echoed back verbatim by the API.

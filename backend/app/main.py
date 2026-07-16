@@ -17,7 +17,18 @@ from app.config import get_settings
 from app.database import SessionLocal
 from app.dndbeyond.sync import CharacterSyncState
 from app.migrations_runner import run_migrations
-from app.routers import auth, bot_control, characters, notes, sessions, settings as settings_router, soundboard, users
+from app.models import Campaign
+from app.routers import (
+    auth,
+    bot_control,
+    campaigns,
+    characters,
+    notes,
+    sessions,
+    settings as settings_router,
+    soundboard,
+    users,
+)
 from app.runtime_config import RuntimeConfigStore
 from app.state import BotState
 from app.tls import ensure_certificate, get_fingerprint
@@ -41,6 +52,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(campaigns.router)
 app.include_router(sessions.router)
 app.include_router(notes.router)
 app.include_router(bot_control.router)
@@ -68,6 +80,21 @@ async def on_startup() -> None:
     config_dir = Path(os.environ.get("LOREKEEPER_CONFIG_DIR", "."))
     runtime_config = RuntimeConfigStore(config_dir, base=settings)
     app.state.runtime_config = runtime_config
+
+    # Smooths the upgrade from pre-Campaign installs (the migration backfills
+    # one Campaign per distinct existing session's campaign_name, but has no
+    # way to know which one should be "active"): if nothing is active yet and
+    # there's exactly one campaign, there's no real ambiguity to ask the GM
+    # about. Two or more existing campaigns is genuinely ambiguous - that's
+    # exactly what the campaign-picker screen is for.
+    if not runtime_config.active_campaign_id:
+        db = SessionLocal()
+        try:
+            campaigns_list = db.query(Campaign).all()
+            if len(campaigns_list) == 1:
+                runtime_config.update(active_campaign_id=campaigns_list[0].id)
+        finally:
+            db.close()
 
     # run.py already generated this (it has to, to pass ssl_certfile/keyfile
     # to uvicorn before the app even starts) - ensure_certificate is

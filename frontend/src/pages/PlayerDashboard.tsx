@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { getMyCharacter, listSessions } from '../api/resources'
+import { getActiveCampaign, getMyCharacter, listSessions } from '../api/resources'
 import { CharacterSheet } from '../components/CharacterSheet'
 import { CharacterIcon, SessionsIcon } from '../components/icons'
 import { NotesPanel } from '../components/NotesPanel'
 import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
-import type { CharacterPublic, SessionLogPublic } from '../types/api'
+import type { CampaignPublic, CharacterPublic, SessionLogPublic } from '../types/api'
 
 type Tab = 'character' | 'sessions'
 
@@ -21,6 +21,7 @@ export function PlayerDashboard() {
   const [characterError, setCharacterError] = useState<string | null>(null)
   const [sessions, setSessions] = useState<SessionLogPublic[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [campaign, setCampaign] = useState<CampaignPublic | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -31,6 +32,9 @@ export function PlayerDashboard() {
       setSessions(logs)
       if (logs.length > 0) setSelectedId(logs[logs.length - 1].id)
     })
+    getActiveCampaign(token)
+      .then(setCampaign)
+      .catch(() => {})
   }, [token])
 
   if (!token || !user) return null
@@ -38,10 +42,17 @@ export function PlayerDashboard() {
   const selected = sessions.find((s) => s.id === selectedId) ?? null
 
   return (
-    <div className="flex gap-4">
-      <Sidebar navItems={NAV_ITEMS} active={tab} onSelect={(key) => setTab(key as Tab)} />
+    <div className="space-y-3">
+      {campaign && (
+        <h2 className="text-sm font-medium text-[var(--text-muted)]">
+          Campaign: <span className="text-[var(--text)]">{campaign.name}</span>
+        </h2>
+      )}
 
-      <div className="min-w-0 flex-1 space-y-4">
+      <div className="flex gap-4">
+        <Sidebar navItems={NAV_ITEMS} active={tab} onSelect={(key) => setTab(key as Tab)} />
+
+        <div className="min-w-0 flex-1 space-y-4">
         {tab === 'character' && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
             {character ? (
@@ -93,6 +104,7 @@ export function PlayerDashboard() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

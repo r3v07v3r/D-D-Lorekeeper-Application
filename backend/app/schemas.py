@@ -46,8 +46,23 @@ class LoginResponse(BaseModel):
 
 # ---- Session logs ----
 
+class CampaignCreate(BaseModel):
+    name: str
+
+
+class CampaignPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    created_at: datetime
+
+
+class SetActiveCampaign(BaseModel):
+    campaign_id: int
+
+
 class SessionLogCreate(BaseModel):
-    campaign_name: str
     session_number: int
     date: date_type
 
@@ -56,6 +71,11 @@ class SessionLogPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    campaign_id: int
+    # Populated from SessionLog.campaign_name, a Python property backed by
+    # the campaign relationship (see app/models.py) - kept as a plain string
+    # here so existing frontend code reading `session.campaign_name` didn't
+    # need to change when campaign_name stopped being a real column.
     campaign_name: str
     session_number: int
     date: date_type

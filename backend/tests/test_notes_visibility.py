@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.auth import SessionRecord
 from app.database import Base
-from app.models import Note, SessionLog, User
+from app.models import Campaign, Note, SessionLog, User
 from app.routers.notes import get_visible_notes
 
 
@@ -32,7 +32,11 @@ def fixtures(db):
     db.add_all([gm, player_a, player_b])
     db.commit()
 
-    log = SessionLog(campaign_name="Test Campaign", session_number=1, date=datetime.date.today())
+    campaign = Campaign(name="Test Campaign")
+    db.add(campaign)
+    db.commit()
+
+    log = SessionLog(campaign_id=campaign.id, session_number=1, date=datetime.date.today())
     db.add(log)
     db.commit()
 
