@@ -38,6 +38,11 @@ class Settings(BaseSettings):
 
     dndbeyond_sync_interval_minutes: int = 15
 
+    # Which Campaign (see app/models.py) new sessions are created under and
+    # GET /sessions returns - see app/routers/campaigns.py. None until the
+    # GM has picked or created one.
+    active_campaign_id: int | None = None
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

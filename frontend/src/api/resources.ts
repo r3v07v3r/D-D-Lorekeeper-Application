@@ -4,6 +4,7 @@
 import { api } from './client'
 import type {
   BotStatusResponse,
+  CampaignPublic,
   CharacterPublic,
   NotePublic,
   PartyMemberPublic,
@@ -15,6 +16,15 @@ import type {
   SoundClipUpload,
   UserPublic,
 } from '../types/api'
+
+export const listCampaigns = (token: string) => api.get<CampaignPublic[]>('/campaigns', token)
+export const createCampaign = (token: string, name: string) =>
+  api.post<CampaignPublic>('/campaigns', { name }, token)
+export const renameCampaign = (token: string, campaignId: number, name: string) =>
+  api.patch<CampaignPublic>(`/campaigns/${campaignId}`, { name }, token)
+export const getActiveCampaign = (token: string) => api.get<CampaignPublic | null>('/campaigns/active', token)
+export const setActiveCampaign = (token: string, campaignId: number) =>
+  api.put<CampaignPublic>('/campaigns/active', { campaign_id: campaignId }, token)
 
 export const listUsers = () => api.get<UserPublic[]>('/users')
 export const createPlayer = (
@@ -28,10 +38,8 @@ export const getUserPresence = (token: string) => api.get<Record<string, boolean
 
 export const listSessions = (token: string) => api.get<SessionLogPublic[]>('/sessions', token)
 export const getSession = (token: string, id: number) => api.get<SessionLogPublic>(`/sessions/${id}`, token)
-export const createSession = (
-  token: string,
-  payload: { campaign_name: string; session_number: number; date: string },
-) => api.post<SessionLogPublic>('/sessions', payload, token)
+export const createSession = (token: string, payload: { session_number: number; date: string }) =>
+  api.post<SessionLogPublic>('/sessions', payload, token)
 export const processSession = (token: string, id: number) =>
   api.post<{ status: string }>(`/sessions/${id}/process`, undefined, token)
 

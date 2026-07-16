@@ -21,11 +21,29 @@ class User(Base):
     dnd_beyond_character_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
+class Campaign(Base):
+    """A campaign is the top-level organizing entity for sessions - a GM
+    running more than one group (or the same group across a game that ended
+    and a new one that started) keeps their session logs separate this way.
+    Deliberately minimal (see app/routers/campaigns.py): only a name is
+    required, and it's editable later - there's no reason to force more
+    setup than that up front.
+    """
+
+    __tablename__ = "campaigns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    sessions: Mapped[list["SessionLog"]] = relationship(back_populates="campaign")
+
+
 class SessionLog(Base):
     __tablename__ = "session_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    campaign_name: Mapped[str] = mapped_column(String, nullable=False)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
     session_number: Mapped[int] = mapped_column(Integer, nullable=False)
     date: Mapped[date_type] = mapped_column(Date, nullable=False)
     full_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -37,7 +55,17 @@ class SessionLog(Base):
     processing_status: Mapped[str] = mapped_column(String, default="pending", nullable=False)
     processing_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    campaign: Mapped["Campaign"] = relationship(back_populates="sessions")
     notes: Mapped[list["Note"]] = relationship(back_populates="session", cascade="all, delete-orphan")
+
+    @property
+    def campaign_name(self) -> str:
+        """Convenience read-through to campaign.name - lets
+        SessionLogPublic (see app/schemas.py) keep serving a plain
+        campaign_name string with no changes needed at every call site that
+        already reads it, even though it is no longer a real column.
+        """
+        return self.campaign.name
 
 
 class Note(Base):

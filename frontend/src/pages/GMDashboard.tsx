@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
   createSession,
+  getActiveCampaign,
   getPartyOverview,
   getSettings,
   getUserPresence,
@@ -9,6 +10,7 @@ import {
   listUsers,
   processSession,
 } from '../api/resources'
+import { CampaignPicker } from '../components/CampaignPicker'
 import { NotesPanel } from '../components/NotesPanel'
 import { BotControlPanel } from '../components/BotControlPanel'
 import { PartyOverview } from '../components/PartyOverview'
@@ -17,7 +19,7 @@ import { HomeIcon, LiveIcon, PartyIcon, SessionsIcon, SettingsIcon } from '../co
 import { SettingsPanel } from '../components/SettingsPanel'
 import { SetupBanner } from '../components/SetupBanner'
 import { SoundboardPanel } from '../components/SoundboardPanel'
-import type { PartyMemberPublic, SessionLogPublic, SetupItem, UserPublic } from '../types/api'
+import type { CampaignPublic, PartyMemberPublic, SessionLogPublic, SetupItem, UserPublic } from '../types/api'
 
 type Tab = 'home' | 'sessions' | 'party' | 'bot' | 'soundboard' | 'settings'
 
@@ -33,9 +35,20 @@ export function GMDashboard() {
   const [focusSettingsKey, setFocusSettingsKey] = useState<string | null>(null)
   const [presence, setPresence] = useState<Record<string, boolean>>({})
 
-  const [campaignName, setCampaignName] = useState('')
+  // undefined = still loading; null = loaded, nothing active yet (shows the
+  // picker); a CampaignPublic once one is selected.
+  const [activeCampaign, setActiveCampaignState] = useState<CampaignPublic | null | undefined>(undefined)
+  const [switchingCampaign, setSwitchingCampaign] = useState(false)
+
   const [sessionNumber, setSessionNumber] = useState('')
   const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    if (!token) return
+    getActiveCampaign(token)
+      .then(setActiveCampaignState)
+      .catch(() => setActiveCampaignState(null))
+  }, [token])
 
   useEffect(() => {
     if (!token) return
@@ -46,7 +59,7 @@ export function GMDashboard() {
     getPartyOverview(token)
       .then(setParty)
       .catch(() => {})
-  }, [token])
+  }, [token, activeCampaign])
 
   useEffect(() => {
     if (!token) return
@@ -107,15 +120,13 @@ export function GMDashboard() {
 
   async function handleCreateSession(e: React.FormEvent) {
     e.preventDefault()
-    if (!token || !campaignName.trim() || !sessionNumber) return
+    if (!token || !sessionNumber) return
     setCreating(true)
     try {
       const log = await createSession(token, {
-        campaign_name: campaignName.trim(),
         session_number: Number(sessionNumber),
         date: new Date().toISOString().slice(0, 10),
       })
-      setCampaignName('')
       setSessionNumber('')
       await refreshSessions()
       setSelectedId(log.id)
@@ -163,6 +174,25 @@ export function GMDashboard() {
 
   if (!token) return null
 
+  if (activeCampaign === undefined) {
+    return <p className="text-sm text-[var(--text-faint)]">Loading...</p>
+  }
+
+  if (activeCampaign === null || switchingCampaign) {
+    return (
+      <CampaignPicker
+        token={token}
+        onSelected={(campaign) => {
+          setActiveCampaignState(campaign)
+          setSwitchingCampaign(false)
+          setSelectedId(null)
+          setTab('home')
+        }}
+        onCancel={activeCampaign ? () => setSwitchingCampaign(false) : undefined}
+      />
+    )
+  }
+
   const selected = sessions.find((s) => s.id === selectedId) ?? null
 
   const requiredSetupCount = setupItems.filter((i) => i.severity === 'required').length
@@ -198,10 +228,24 @@ export function GMDashboard() {
   )
 
   return (
-    <div className="flex gap-4">
-      <Sidebar navItems={navItems} active={tab} onSelect={(key) => setTab(key as Tab)} footer={partyFooter || undefined} />
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-[var(--text-muted)]">
+          Campaign: <span className="text-[var(--text)]">{activeCampaign.name}</span>
+        </h2>
+        <button
+          type="button"
+          onClick={() => setSwitchingCampaign(true)}
+          className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)]"
+        >
+          Switch campaign
+        </button>
+      </div>
 
-      <div className="min-w-0 flex-1 space-y-4">
+      <div className="flex gap-4">
+        <Sidebar navItems={navItems} active={tab} onSelect={(key) => setTab(key as Tab)} footer={partyFooter || undefined} />
+
+        <div className="min-w-0 flex-1 space-y-4">
         {tab === 'home' && <SetupBanner items={setupItems} onGoToSettings={goToSettings} />}
 
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
@@ -317,12 +361,6 @@ export function GMDashboard() {
             <div className="space-y-3 lg:col-span-1">
               <form onSubmit={handleCreateSession} className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                 <input
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="Campaign name"
-                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)]"
-                />
-                <input
                   value={sessionNumber}
                   onChange={(e) => setSessionNumber(e.target.value.replace(/\D/g, ''))}
                   placeholder="Session #"
@@ -330,7 +368,7 @@ export function GMDashboard() {
                 />
                 <button
                   type="submit"
-                  disabled={creating || !campaignName.trim() || !sessionNumber}
+                  disabled={creating || !sessionNumber}
                   className="w-full rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
                 >
                   New session
@@ -416,6 +454,7 @@ export function GMDashboard() {
         {tab === 'soundboard' && <SoundboardPanel token={token} />}
 
         {tab === 'settings' && <SettingsPanel token={token} focusKey={focusSettingsKey} />}
+        </div>
       </div>
     </div>
   )

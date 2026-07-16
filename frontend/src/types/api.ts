@@ -17,8 +17,15 @@ export interface LoginResponse {
   user: UserPublic
 }
 
+export interface CampaignPublic {
+  id: number
+  name: string
+  created_at: string
+}
+
 export interface SessionLogPublic {
   id: number
+  campaign_id: number
   campaign_name: string
   session_number: number
   date: string

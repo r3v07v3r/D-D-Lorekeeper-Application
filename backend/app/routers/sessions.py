@@ -32,9 +32,20 @@ def _redact_for_role(log: SessionLog, role: str) -> SessionLogPublic:
 @router.get("", response_model=list[SessionLogPublic])
 def list_sessions(
     db: Session = Depends(get_db),
+    runtime_config: RuntimeConfigStore = Depends(get_runtime_config),
     current: SessionRecord = Depends(get_current_user),
 ) -> list[SessionLogPublic]:
-    logs = db.query(SessionLog).order_by(SessionLog.session_number).all()
+    # No active campaign yet (fresh install, or the GM hasn't picked one) -
+    # nothing to show rather than an unfiltered dump across every campaign
+    # that has ever existed on this install.
+    if not runtime_config.active_campaign_id:
+        return []
+    logs = (
+        db.query(SessionLog)
+        .filter(SessionLog.campaign_id == runtime_config.active_campaign_id)
+        .order_by(SessionLog.session_number)
+        .all()
+    )
     return [_redact_for_role(log, current.role) for log in logs]
 
 
@@ -54,10 +65,16 @@ def get_session(
 def create_session(
     payload: SessionLogCreate,
     db: Session = Depends(get_db),
+    runtime_config: RuntimeConfigStore = Depends(get_runtime_config),
     _current: SessionRecord = Depends(require_gm),
 ) -> SessionLog:
+    if not runtime_config.active_campaign_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active campaign selected - choose or create one first",
+        )
     log = SessionLog(
-        campaign_name=payload.campaign_name,
+        campaign_id=runtime_config.active_campaign_id,
         session_number=payload.session_number,
         date=payload.date,
     )

@@ -137,6 +137,12 @@ only settings are reset).
 
 ## Running a session
 
+The first time you open Lorekeeper (or if you ever click **Switch campaign**), you'll be
+asked to pick or create a **campaign** - only a name is required, and it's editable later.
+This is what sessions get organized under, and it's the same campaign name your players see
+once they connect - useful if you run more than one group, or start a new campaign after an
+old one wraps up.
+
 1. **Bot Control** tab → paste your Discord voice channel ID → **Join**.
    (Right-click the voice channel in Discord → *Copy Channel ID*; enable Developer Mode
    in Discord's settings if you don't see that option.)
