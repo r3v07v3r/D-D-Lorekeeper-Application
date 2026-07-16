@@ -20,6 +20,7 @@ export function SettingsPanel({ token }: { token: string }) {
   const [chunkMinutes, setChunkMinutes] = useState('')
   const [syncMinutes, setSyncMinutes] = useState('')
   const [showBotWalkthrough, setShowBotWalkthrough] = useState(false)
+  const [showOpenaiWalkthrough, setShowOpenaiWalkthrough] = useState(false)
   const [llmProvider, setLlmProvider] = useState<'openai' | 'ollama'>('openai')
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState('')
   const [transcriptionProvider, setTranscriptionProvider] = useState<'openai' | 'local'>('openai')
@@ -90,7 +91,7 @@ export function SettingsPanel({ token }: { token: string }) {
       {error && <p className="text-sm text-red-400">{error}</p>}
       {saved && <p className="text-sm text-emerald-400">Saved.</p>}
 
-      <div>
+      <div id="setup-discord_bot_token">
         <label className="mb-1 block text-sm text-slate-400">
           Discord Bot Token{' '}
           <span className={settings.discord_bot_token_set ? 'text-emerald-400' : 'text-slate-500'}>
@@ -150,7 +151,7 @@ export function SettingsPanel({ token }: { token: string }) {
         )}
       </div>
 
-      <div>
+      <div id="setup-openai_api_key">
         <label className="mb-1 block text-sm text-slate-400">
           OpenAI API Key{' '}
           <span className={settings.openai_api_key_set ? 'text-emerald-400' : 'text-slate-500'}>
@@ -164,6 +165,60 @@ export function SettingsPanel({ token }: { token: string }) {
           placeholder={settings.openai_api_key_set ? 'Leave blank to keep current key' : 'sk-...'}
           className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
         />
+        <p className="mt-1 text-xs text-slate-500">
+          Only needed if you use the OpenAI provider for transcription or summarization below - skip
+          this entirely if you're using local Whisper and Ollama for both.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowOpenaiWalkthrough((v) => !v)}
+          className="mt-1 text-xs text-indigo-400 hover:text-indigo-300"
+        >
+          {showOpenaiWalkthrough ? 'Hide' : "Don't have a key yet? Show me how to make one"}
+        </button>
+        {showOpenaiWalkthrough && (
+          <ol className="mt-2 list-decimal space-y-2 rounded-md border border-slate-700 bg-slate-950 p-3 pl-7 text-xs text-slate-300">
+            <li>
+              Create an account (or log in) at{' '}
+              <a
+                href="https://platform.openai.com/signup"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-400 underline hover:text-indigo-300"
+              >
+                platform.openai.com
+              </a>
+              . This is a separate account from ChatGPT's consumer plans - it's pay-as-you-go, billed
+              by usage.
+            </li>
+            <li>
+              Add a payment method under{' '}
+              <a
+                href="https://platform.openai.com/settings/organization/billing/overview"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-400 underline hover:text-indigo-300"
+              >
+                Billing
+              </a>
+              . A typical multi-hour session costs a few dollars in transcription + summarization.
+            </li>
+            <li>
+              Go to{' '}
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-400 underline hover:text-indigo-300"
+              >
+                API Keys
+              </a>
+              , click <strong>Create new secret key</strong>, and copy it immediately - OpenAI only
+              shows it once.
+            </li>
+            <li>Paste it into the field above and save.</li>
+          </ol>
+        )}
       </div>
 
       <div className="rounded-md border border-indigo-900 bg-indigo-950/40 p-3">
@@ -186,7 +241,7 @@ export function SettingsPanel({ token }: { token: string }) {
             LAN address: <span className="font-mono text-emerald-400">{settings.detected_lan_ip}:{settings.server_port}</span>
           </p>
         )}
-        <label className="mb-1 block text-sm text-slate-400">
+        <label id="setup-campaign_passphrase" className="mb-1 block text-sm text-slate-400">
           Campaign Passphrase{' '}
           <span className={settings.campaign_passphrase_set ? 'text-emerald-400' : 'text-amber-400'}>
             ({settings.campaign_passphrase_set ? 'set' : 'not set - only this computer can log in'})
@@ -322,7 +377,7 @@ export function SettingsPanel({ token }: { token: string }) {
         )}
       </div>
 
-      <div className="rounded-md border border-slate-700 bg-slate-900 p-3">
+      <div id="setup-ollama" className="rounded-md border border-slate-700 bg-slate-900 p-3">
         <h4 className="mb-1 text-sm font-semibold text-slate-200">Summarization</h4>
         <p className="mb-2 text-xs text-slate-400">
           Turns the transcript into GM and player recaps. OpenAI's GPT-4o gives the highest quality

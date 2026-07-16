@@ -77,6 +77,12 @@ export interface BotStatusResponse {
   current_session_log_id: number | null
 }
 
+export interface SetupItem {
+  key: string
+  severity: 'required' | 'optional'
+  message: string
+}
+
 export interface SettingsPublic {
   discord_bot_token_set: boolean
   openai_api_key_set: boolean
@@ -94,6 +100,7 @@ export interface SettingsPublic {
   detected_public_ip: string | null
   certificate_fingerprint: string
   server_port: number
+  setup_items: SetupItem[]
 }
 
 export interface SettingsUpdate {

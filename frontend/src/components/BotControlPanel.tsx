@@ -54,20 +54,26 @@ export function BotControlPanel({ token, activeSessionId }: { token: string; act
       )}
 
       {!status?.connected ? (
-        <div className="flex gap-2">
-          <input
-            value={channelId}
-            onChange={(e) => setChannelId(e.target.value)}
-            placeholder="Discord voice channel ID"
-            className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
-          />
-          <button
-            disabled={busy || !channelId.trim()}
-            onClick={() => withBusy(() => joinVoiceChannel(token, Number(channelId.trim())))}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-          >
-            Join
-          </button>
+        <div>
+          <div className="flex gap-2">
+            <input
+              value={channelId}
+              onChange={(e) => setChannelId(e.target.value)}
+              placeholder="Discord voice channel ID"
+              className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+            />
+            <button
+              disabled={busy || !channelId.trim()}
+              onClick={() => withBusy(() => joinVoiceChannel(token, Number(channelId.trim())))}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            >
+              Join
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Don't know the ID? In Discord, enable <strong>Settings → Advanced → Developer Mode</strong>,
+            then right-click the voice channel and choose <strong>Copy Channel ID</strong>.
+          </p>
         </div>
       ) : (
         <button

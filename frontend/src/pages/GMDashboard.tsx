@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { createSession, listSessions, listUsers, processSession } from '../api/resources'
+import { createSession, getSettings, listSessions, listUsers, processSession } from '../api/resources'
 import { NotesPanel } from '../components/NotesPanel'
 import { BotControlPanel } from '../components/BotControlPanel'
 import { PartyOverview } from '../components/PartyOverview'
 import { SettingsPanel } from '../components/SettingsPanel'
+import { SetupBanner } from '../components/SetupBanner'
 import { SoundboardPanel } from '../components/SoundboardPanel'
-import type { SessionLogPublic, UserPublic } from '../types/api'
+import type { SessionLogPublic, SetupItem, UserPublic } from '../types/api'
 
 type Tab = 'sessions' | 'party' | 'bot' | 'soundboard' | 'settings'
 
@@ -17,6 +18,7 @@ export function GMDashboard() {
   const [players, setPlayers] = useState<UserPublic[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [setupItems, setSetupItems] = useState<SetupItem[]>([])
 
   const [campaignName, setCampaignName] = useState('')
   const [sessionNumber, setSessionNumber] = useState('')
@@ -29,6 +31,25 @@ export function GMDashboard() {
       .then((all) => setPlayers(all.filter((u) => u.role === 'player')))
       .catch(() => {})
   }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    // Re-checked every time the active tab changes (not just on mount) so
+    // the banner reflects whatever the GM just changed after leaving
+    // Settings, without needing a dedicated polling loop. Guarded against a
+    // superseded request resolving after a newer one (e.g. quick tab
+    // switches, or React StrictMode's dev-only double-invoke) and clobbering
+    // fresher data with stale data.
+    let cancelled = false
+    getSettings(token)
+      .then((s) => {
+        if (!cancelled) setSetupItems(s.setup_items)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [token, tab])
 
   async function refreshSessions() {
     if (!token) return
@@ -73,9 +94,33 @@ export function GMDashboard() {
     }
   }
 
+  // SettingsPanel fetches its own data asynchronously before rendering the
+  // actual form fields, so the "setup-<key>" anchor a banner item points at
+  // doesn't exist in the DOM the instant we switch tabs - retries briefly
+  // rather than assuming a single frame/timeout is enough.
+  function goToSettings(key?: string) {
+    setTab('settings')
+    if (!key) return
+    let attempts = 0
+    const tryScroll = () => {
+      const el = document.getElementById(`setup-${key}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('ring-2', 'ring-indigo-500', 'rounded-md')
+        setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-500', 'rounded-md'), 2000)
+        return
+      }
+      attempts += 1
+      if (attempts < 20) setTimeout(tryScroll, 100)
+    }
+    setTimeout(tryScroll, 50)
+  }
+
   if (!token) return null
 
   const selected = sessions.find((s) => s.id === selectedId) ?? null
+
+  const requiredSetupCount = setupItems.filter((i) => i.severity === 'required').length
 
   return (
     <div className="space-y-4">
@@ -84,14 +129,24 @@ export function GMDashboard() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-3 py-2 text-sm font-medium capitalize ${
+            className={`relative px-3 py-2 text-sm font-medium capitalize ${
               tab === t ? 'border-b-2 border-indigo-500 text-slate-100' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             {t === 'bot' ? 'Bot Control' : t}
+            {t === 'settings' && requiredSetupCount > 0 && (
+              <span
+                title={`${requiredSetupCount} setup item(s) need attention`}
+                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white"
+              >
+                {requiredSetupCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>
+
+      {tab !== 'settings' && <SetupBanner items={setupItems} onGoToSettings={goToSettings} />}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 

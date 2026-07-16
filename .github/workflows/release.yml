@@ -1,0 +1,88 @@
+# Runs on every push to main, but only actually builds/publishes when
+# electron/package.json's version doesn't already have a matching GitHub
+# release - bumping that version is what signals "this push is a release",
+# same as the manual process this replaces (see README). Pushes that don't
+# bump it (docs, CI tweaks, etc.) are a fast no-op instead of failing on a
+# duplicate release.
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        run: |
+          VERSION=$(node -p "require('./electron/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --tags origin | grep -q "refs/tags/v$VERSION\$"; then
+            echo "Release v$VERSION already exists - skipping build."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release for v$VERSION yet - building."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-release:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Ensure ffmpeg is available
+        shell: bash
+        run: ffmpeg -version || choco install ffmpeg -y
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-build.txt
+
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m pytest
+
+      - name: Build backend executable
+        working-directory: backend
+        run: python build_backend.py
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type-check and build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install electron dependencies
+        working-directory: electron
+        run: npm ci
+
+      - name: Build and publish release
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win nsis --publish always

@@ -108,6 +108,17 @@ class SettingsUpdate(BaseModel):
     campaign_passphrase: str | None = None
 
 
+class SetupItem(BaseModel):
+    """One thing the GM hasn't finished configuring yet - see
+    app/routers/settings.py:_compute_setup_items(). "required" items mean a
+    core feature (recording, transcription, summarization) won't work at all;
+    "optional" items are fine to leave for solo/local-only play.
+    """
+    key: str
+    severity: str  # "required" | "optional"
+    message: str
+
+
 class SettingsPublic(BaseModel):
     discord_bot_token_set: bool
     openai_api_key_set: bool
@@ -125,6 +136,7 @@ class SettingsPublic(BaseModel):
     detected_public_ip: str | None = None
     certificate_fingerprint: str
     server_port: int
+    setup_items: list[SetupItem]
 
 
 # ---- Soundboard ----
