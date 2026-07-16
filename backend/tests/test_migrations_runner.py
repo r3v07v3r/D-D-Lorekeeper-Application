@@ -9,7 +9,18 @@ from sqlalchemy import create_engine, inspect
 from app.database import Base
 from app.migrations_runner import run_migrations
 
-EXPECTED_TABLES = {"alembic_version", "campaigns", "characters", "notes", "session_logs", "sound_clips", "users"}
+EXPECTED_TABLES = {
+    "alembic_version",
+    "campaigns",
+    "characters",
+    "combatants",
+    "encounters",
+    "notes",
+    "roll_log_entries",
+    "session_logs",
+    "sound_clips",
+    "users",
+}
 
 
 def _tables(database_url: str) -> set[str]:

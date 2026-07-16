@@ -112,6 +112,51 @@ export interface PartyMemberPublic {
   sync_error: string | null
 }
 
+export interface CombatantPublic {
+  id: number
+  user_id: number | null
+  name: string
+  hp_current: number
+  hp_max: number
+  armor_class: number
+  initiative: number
+}
+
+export interface EncounterPublic {
+  id: number
+  campaign_id: number
+  name: string
+  round: number
+  turn_index: number
+  combatants: CombatantPublic[]
+}
+
+export interface CombatantCreate {
+  name?: string
+  user_id?: number
+  hp_current?: number
+  hp_max?: number
+  armor_class?: number
+  initiative?: number
+}
+
+export interface CombatantUpdate {
+  name?: string
+  hp_current?: number
+  hp_max?: number
+  armor_class?: number
+  initiative?: number
+}
+
+export interface RollPublic {
+  id: number
+  user_id: number
+  username: string
+  summary: string
+  total: number
+  created_at: string
+}
+
 export interface BotStatusResponse {
   connected: boolean
   is_recording: boolean

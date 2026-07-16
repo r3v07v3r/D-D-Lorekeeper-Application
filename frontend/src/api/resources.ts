@@ -7,8 +7,12 @@ import type {
   CampaignPublic,
   CharacterInput,
   CharacterPublic,
+  CombatantCreate,
+  CombatantUpdate,
+  EncounterPublic,
   NotePublic,
   PartyMemberPublic,
+  RollPublic,
   SessionLogPublic,
   SettingsPublic,
   SettingsUpdate,
@@ -88,3 +92,20 @@ export const playSoundClip = (token: string, clipId: number) =>
 export const stopSoundClip = (token: string) => api.post<void>('/soundboard/stop', undefined, token)
 export const getSoundClipAudio = (token: string, clipId: number) =>
   api.get<SoundClipAudio>(`/soundboard/${clipId}/audio`, token)
+
+export const getActiveEncounter = (token: string) => api.get<EncounterPublic | null>('/encounters/active', token)
+export const startEncounter = (token: string) => api.post<EncounterPublic>('/encounters', undefined, token)
+export const addCombatant = (token: string, encounterId: number, payload: CombatantCreate) =>
+  api.post<EncounterPublic>(`/encounters/${encounterId}/combatants`, payload, token)
+export const updateCombatant = (token: string, encounterId: number, combatantId: number, payload: CombatantUpdate) =>
+  api.patch<EncounterPublic>(`/encounters/${encounterId}/combatants/${combatantId}`, payload, token)
+export const removeCombatant = (token: string, encounterId: number, combatantId: number) =>
+  api.delete<void>(`/encounters/${encounterId}/combatants/${combatantId}`, token)
+export const nextTurn = (token: string, encounterId: number) =>
+  api.post<EncounterPublic>(`/encounters/${encounterId}/next-turn`, undefined, token)
+export const endEncounter = (token: string, encounterId: number) =>
+  api.post<void>(`/encounters/${encounterId}/end`, undefined, token)
+
+export const listRolls = (token: string, sinceId = 0) => api.get<RollPublic[]>(`/rolls?since_id=${sinceId}`, token)
+export const createRoll = (token: string, payload: { summary: string; total: number }) =>
+  api.post<RollPublic>('/rolls', payload, token)

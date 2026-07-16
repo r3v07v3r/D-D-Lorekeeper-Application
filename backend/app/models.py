@@ -1,4 +1,6 @@
-"""SQLAlchemy models: Users, SessionLogs, Notes, SoundClips, Characters."""
+"""SQLAlchemy models: Users, SessionLogs, Notes, SoundClips, Characters,
+Encounters/Combatants, RollLogEntries.
+"""
 from datetime import date as date_type
 from datetime import datetime
 
@@ -177,4 +179,70 @@ class SoundClip(Base):
     # used to sniff the extension at upload time).
     filename: Mapped[str] = mapped_column(String, nullable=False)
     volume: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+
+class Encounter(Base):
+    """A GM-run combat, scoped to the active campaign. At most one open
+    (ended_at is None) encounter per campaign at a time - see
+    app/routers/encounters.py, which enforces that rather than this model.
+    Turn order is derived by sorting combatants by initiative descending
+    (highest first, 5e convention) rather than stored as its own ordered
+    list, so reordering never needs a data migration of its own -
+    turn_index is just a position into that sorted view.
+    """
+
+    __tablename__ = "encounters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False, default="Encounter")
+    round: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    combatants: Mapped[list["Combatant"]] = relationship(back_populates="encounter", cascade="all, delete-orphan")
+
+
+class Combatant(Base):
+    """One participant in an Encounter - either a monster/NPC the GM typed
+    in ad hoc (user_id is None) or a player's own character (user_id set).
+    For a player-linked combatant, applying damage/healing here also writes
+    through to that Character's hp_current (see
+    app/routers/encounters.py:update_combatant) - the same HP everywhere,
+    rather than a second copy that can drift from the character sheet.
+    """
+
+    __tablename__ = "combatants"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    encounter_id: Mapped[int] = mapped_column(ForeignKey("encounters.id"), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    hp_current: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    hp_max: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    armor_class: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    initiative: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    encounter: Mapped["Encounter"] = relationship(back_populates="combatants")
+
+
+class RollLogEntry(Base):
+    """One dice roll, broadcast to the whole table - see
+    app/routers/rolls.py. Polled (GET /rolls?since_id=), the same pattern as
+    presence (app/routers/users.py) rather than a websocket, consistent with
+    the rest of this app's no-websocket-yet architecture. username is a
+    snapshot at roll time (not a live join to User) so the log still reads
+    correctly if the account is later renamed or removed.
+    """
+
+    __tablename__ = "roll_log_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    summary: Mapped[str] = mapped_column(String, nullable=False)
+    total: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

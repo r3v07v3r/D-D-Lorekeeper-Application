@@ -61,6 +61,15 @@ export function CharacterIcon({ className = base }: IconProps) {
   )
 }
 
+export function CombatIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className}>
+      <path d="M6.5 17.5 17 7M14 4l6 6-2.5 2.5L11 6z" />
+      <path d="M4 20l3.5-1 8-8-2.5-2.5-8 8Z" />
+    </svg>
+  )
+}
+
 export function DiceIcon({ className = base }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className}>
