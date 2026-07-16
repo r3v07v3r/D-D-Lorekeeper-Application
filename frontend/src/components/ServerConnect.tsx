@@ -74,32 +74,32 @@ export function ServerConnect({ onChanged }: { onChanged: () => void }) {
   }
 
   return (
-    <div className="mb-4 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-sm">
+    <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--bg)]/50 p-3 text-sm">
       <div className="flex items-center justify-between">
-        <span className="text-slate-400">
-          Server: <span className="text-slate-200">{isLocal ? 'This computer' : config.baseUrl}</span>
+        <span className="text-[var(--text-muted)]">
+          Server: <span className="text-[var(--text)]">{isLocal ? 'This computer' : config.baseUrl}</span>
         </span>
-        <button onClick={() => setExpanded((v) => !v)} className="text-indigo-400 hover:text-indigo-300">
+        <button onClick={() => setExpanded((v) => !v)} className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
           {expanded ? 'Cancel' : "Joining someone else's game?"}
         </button>
       </div>
 
       {expanded && (
         <form onSubmit={handleConnect} className="mt-3 space-y-2">
-          <p className="text-xs text-slate-500">Paste the share code your GM sent you (from their Settings tab).</p>
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          <p className="text-xs text-[var(--text-faint)]">Paste the share code your GM sent you (from their Settings tab).</p>
+          {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
           <textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Paste share code here"
             rows={3}
-            className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 font-mono text-xs text-slate-100 placeholder-slate-500"
+            className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 font-mono text-xs text-[var(--text)] placeholder-[var(--text-faint)]"
           />
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={connecting || !code.trim()}
-              className="rounded-md bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              className="rounded-md bg-[var(--accent)] px-3 py-1.5 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
             >
               {connecting ? 'Connecting...' : 'Connect'}
             </button>
@@ -107,7 +107,7 @@ export function ServerConnect({ onChanged }: { onChanged: () => void }) {
               <button
                 type="button"
                 onClick={handleUseThisComputer}
-                className="rounded-md border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800"
+                className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-2)]"
               >
                 Use this computer instead
               </button>

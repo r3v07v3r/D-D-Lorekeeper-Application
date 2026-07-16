@@ -59,6 +59,16 @@ class SessionStore:
         with self._lock:
             self._sessions.pop(token, None)
 
+    def connected_user_ids(self) -> set[int]:
+        """user_ids with at least one live session token right now - the
+        basis for the dashboard's "presence" indicator (see
+        app/routers/users.py:get_presence). This is app-level connectivity
+        (a logged-in Lorekeeper session), not Discord voice-channel presence,
+        which is a separate, not-yet-built signal.
+        """
+        with self._lock:
+            return {record.user_id for record in self._sessions.values()}
+
 
 def _extract_bearer_token(authorization: str | None) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):

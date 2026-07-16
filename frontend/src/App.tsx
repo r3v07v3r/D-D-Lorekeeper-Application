@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { GMDashboard } from './pages/GMDashboard'
 import { PlayerDashboard } from './pages/PlayerDashboard'
+import { ThemeProvider } from './theme/ThemeContext'
 
 // HashRouter (not BrowserRouter) because this app is ultimately served from
 // a static file:// index.html inside Electron (Phase 5) - there is no
@@ -24,13 +25,15 @@ function RootRoute() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <HashRouter>
-        <Routes>
-          <Route path="/" element={<RootRoute />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Routes>
-      </HashRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <HashRouter>
+          <Routes>
+            <Route path="/" element={<RootRoute />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Routes>
+        </HashRouter>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

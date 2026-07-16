@@ -1,24 +1,37 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { createSession, getSettings, listSessions, listUsers, processSession } from '../api/resources'
+import {
+  createSession,
+  getPartyOverview,
+  getSettings,
+  getUserPresence,
+  listSessions,
+  listUsers,
+  processSession,
+} from '../api/resources'
 import { NotesPanel } from '../components/NotesPanel'
 import { BotControlPanel } from '../components/BotControlPanel'
 import { PartyOverview } from '../components/PartyOverview'
+import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
+import { HomeIcon, LiveIcon, PartyIcon, SessionsIcon, SettingsIcon } from '../components/icons'
 import { SettingsPanel } from '../components/SettingsPanel'
 import { SetupBanner } from '../components/SetupBanner'
 import { SoundboardPanel } from '../components/SoundboardPanel'
-import type { SessionLogPublic, SetupItem, UserPublic } from '../types/api'
+import type { PartyMemberPublic, SessionLogPublic, SetupItem, UserPublic } from '../types/api'
 
-type Tab = 'sessions' | 'party' | 'bot' | 'soundboard' | 'settings'
+type Tab = 'home' | 'sessions' | 'party' | 'bot' | 'soundboard' | 'settings'
 
 export function GMDashboard() {
   const { token } = useAuth()
-  const [tab, setTab] = useState<Tab>('sessions')
+  const [tab, setTab] = useState<Tab>('home')
   const [sessions, setSessions] = useState<SessionLogPublic[]>([])
   const [players, setPlayers] = useState<UserPublic[]>([])
+  const [party, setParty] = useState<PartyMemberPublic[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [setupItems, setSetupItems] = useState<SetupItem[]>([])
+  const [focusSettingsKey, setFocusSettingsKey] = useState<string | null>(null)
+  const [presence, setPresence] = useState<Record<string, boolean>>({})
 
   const [campaignName, setCampaignName] = useState('')
   const [sessionNumber, setSessionNumber] = useState('')
@@ -30,26 +43,55 @@ export function GMDashboard() {
     listUsers()
       .then((all) => setPlayers(all.filter((u) => u.role === 'player')))
       .catch(() => {})
+    getPartyOverview(token)
+      .then(setParty)
+      .catch(() => {})
   }, [token])
 
   useEffect(() => {
     if (!token) return
-    // Re-checked every time the active tab changes (not just on mount) so
-    // the banner reflects whatever the GM just changed after leaving
-    // Settings, without needing a dedicated polling loop. Guarded against a
-    // superseded request resolving after a newer one (e.g. quick tab
-    // switches, or React StrictMode's dev-only double-invoke) and clobbering
-    // fresher data with stale data.
+    // On mount + a periodic interval, not on every tab change - refetching
+    // this on every single navigation click (regardless of whether Settings
+    // was even involved) made ordinary tab switching feel slow, since this
+    // call can carry a real network cost server-side (Ollama reachability,
+    // public IP detection). Guarded against a superseded request resolving
+    // after a newer one and clobbering fresher data with stale data.
     let cancelled = false
-    getSettings(token)
-      .then((s) => {
-        if (!cancelled) setSetupItems(s.setup_items)
-      })
-      .catch(() => {})
+    function refresh() {
+      getSettings(token as string)
+        .then((s) => {
+          if (!cancelled) setSetupItems(s.setup_items)
+        })
+        .catch(() => {})
+    }
+    refresh()
+    const interval = setInterval(refresh, 30_000)
     return () => {
       cancelled = true
+      clearInterval(interval)
     }
-  }, [token, tab])
+  }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    // Polled at the same 5s cadence BotControlPanel already uses for its own
+    // status - this is an in-memory, no-I/O lookup server-side (see
+    // SessionStore.connected_user_ids), so frequent polling costs nothing.
+    let cancelled = false
+    function refresh() {
+      getUserPresence(token as string)
+        .then((p) => {
+          if (!cancelled) setPresence(p)
+        })
+        .catch(() => {})
+    }
+    refresh()
+    const interval = setInterval(refresh, 5_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [token])
 
   async function refreshSessions() {
     if (!token) return
@@ -97,17 +139,20 @@ export function GMDashboard() {
   // SettingsPanel fetches its own data asynchronously before rendering the
   // actual form fields, so the "setup-<key>" anchor a banner item points at
   // doesn't exist in the DOM the instant we switch tabs - retries briefly
-  // rather than assuming a single frame/timeout is enough.
+  // rather than assuming a single frame/timeout is enough. focusSettingsKey
+  // additionally tells SettingsPanel which of its own sub-tabs to switch to,
+  // since the anchor may live in a section that isn't currently selected.
   function goToSettings(key?: string) {
     setTab('settings')
+    setFocusSettingsKey(key ?? null)
     if (!key) return
     let attempts = 0
     const tryScroll = () => {
       const el = document.getElementById(`setup-${key}`)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        el.classList.add('ring-2', 'ring-indigo-500', 'rounded-md')
-        setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-500', 'rounded-md'), 2000)
+        el.classList.add('ring-2', 'ring-[var(--accent)]', 'rounded-md')
+        setTimeout(() => el.classList.remove('ring-2', 'ring-[var(--accent)]', 'rounded-md'), 2000)
         return
       }
       attempts += 1
@@ -122,138 +167,256 @@ export function GMDashboard() {
 
   const requiredSetupCount = setupItems.filter((i) => i.severity === 'required').length
 
-  return (
-    <div className="space-y-4">
-      <nav className="flex gap-2 border-b border-slate-800">
-        {(['sessions', 'party', 'bot', 'soundboard', 'settings'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`relative px-3 py-2 text-sm font-medium capitalize ${
-              tab === t ? 'border-b-2 border-indigo-500 text-slate-100' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {t === 'bot' ? 'Bot Control' : t}
-            {t === 'settings' && requiredSetupCount > 0 && (
+  const navItems: SidebarNavItem[] = [
+    { key: 'home', label: 'Home', icon: <HomeIcon /> },
+    { key: 'sessions', label: 'Sessions', icon: <SessionsIcon /> },
+    { key: 'party', label: 'Party', icon: <PartyIcon /> },
+    { key: 'bot', label: 'Bot Control', icon: <LiveIcon /> },
+    { key: 'soundboard', label: 'Soundboard', icon: <LiveIcon /> },
+    { key: 'settings', label: 'Settings', icon: <SettingsIcon />, badge: requiredSetupCount },
+  ]
+
+  const partyFooter = players.length > 0 && (
+    <div>
+      <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
+        Party
+      </div>
+      <ul className="space-y-1">
+        {players.map((p) => {
+          const online = presence[String(p.id)] === true
+          return (
+            <li key={p.id} className="flex items-center gap-2 text-xs" title={online ? 'Connected' : 'Offline'}>
               <span
-                title={`${requiredSetupCount} setup item(s) need attention`}
-                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white"
-              >
-                {requiredSetupCount}
-              </span>
-            )}
-          </button>
-        ))}
-      </nav>
-
-      {tab !== 'settings' && <SetupBanner items={setupItems} onGoToSettings={goToSettings} />}
-
-      {error && <p className="text-sm text-red-400">{error}</p>}
-
-      {tab === 'sessions' && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="space-y-3 lg:col-span-1">
-            <form onSubmit={handleCreateSession} className="space-y-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
-              <input
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="Campaign name"
-                className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+                className={`h-2 w-2 shrink-0 rounded-full ${online ? 'bg-[var(--success)]' : 'bg-[var(--text-faint)]'}`}
               />
-              <input
-                value={sessionNumber}
-                onChange={(e) => setSessionNumber(e.target.value.replace(/\D/g, ''))}
-                placeholder="Session #"
-                className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
-              />
-              <button
-                type="submit"
-                disabled={creating || !campaignName.trim() || !sessionNumber}
-                className="w-full rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-              >
-                New session
-              </button>
-            </form>
+              <span className={online ? 'text-[var(--text)]' : 'text-[var(--text-faint)]'}>{p.username}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
 
-            <ul className="space-y-1">
-              {sessions.map((s) => (
-                <li key={s.id}>
+  return (
+    <div className="flex gap-4">
+      <Sidebar navItems={navItems} active={tab} onSelect={(key) => setTab(key as Tab)} footer={partyFooter || undefined} />
+
+      <div className="min-w-0 flex-1 space-y-4">
+        {tab === 'home' && <SetupBanner items={setupItems} onGoToSettings={goToSettings} />}
+
+        {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+
+        {tab === 'home' && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              {(() => {
+                const lastComplete = [...sessions].reverse().find((s) => s.processing_status === 'complete')
+                return lastComplete ? (
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                    <h4 className="mb-2 text-sm font-semibold text-[var(--text)]">
+                      Continue the story <span className="font-normal text-[var(--text-faint)]">- Session {lastComplete.session_number}</span>
+                    </h4>
+                    <p className="mb-3 whitespace-pre-wrap text-sm text-[var(--text-muted)]">
+                      {lastComplete.player_summary ?? lastComplete.gm_summary}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(lastComplete.id)
+                        setTab('sessions')
+                      }}
+                      className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+                    >
+                      Open Session {lastComplete.session_number}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                    <h4 className="mb-1 text-sm font-semibold text-[var(--text)]">Continue the story</h4>
+                    <p className="text-sm text-[var(--text-faint)]">
+                      No processed sessions yet - transcribe a session to see its recap here.
+                    </p>
+                  </div>
+                )
+              })()}
+
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                <h4 className="mb-2 text-sm font-semibold text-[var(--text)]">Quick actions</h4>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setSelectedId(s.id)}
-                    className={`w-full rounded-md px-3 py-2 text-left text-sm ${
-                      selectedId === s.id ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-900'
-                    }`}
+                    type="button"
+                    onClick={() => setTab('sessions')}
+                    className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
                   >
-                    <div className="font-medium">
-                      {s.campaign_name} - Session {s.session_number}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {s.date} - {s.processing_status}
-                    </div>
+                    Go to Sessions
                   </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="lg:col-span-2">
-            {selected ? (
-              <div className="space-y-4 rounded-lg border border-slate-800 bg-slate-900 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-100">
-                    {selected.campaign_name} - Session {selected.session_number}
-                  </h3>
                   <button
-                    onClick={() => handleProcess(selected.id)}
-                    disabled={selected.processing_status === 'processing'}
-                    className="rounded-md border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800 disabled:opacity-50"
+                    type="button"
+                    onClick={() => setTab('bot')}
+                    className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--surface-2)]"
                   >
-                    {selected.processing_status === 'processing'
-                      ? 'Processing...'
-                      : selected.processing_status === 'complete'
-                        ? 'Re-process'
-                        : 'Transcribe + Summarize'}
+                    Bot Control
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab('soundboard')}
+                    className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--surface-2)]"
+                  >
+                    Open Soundboard
                   </button>
                 </div>
-
-                {selected.processing_status === 'error' && (
-                  <p className="text-sm text-red-400">{selected.processing_error}</p>
-                )}
-
-                <div>
-                  <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                    Master Summary (uncensored)
-                  </h4>
-                  <p className="whitespace-pre-wrap text-sm text-slate-300">
-                    {selected.gm_summary ?? 'Not generated yet.'}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                    Full Transcript
-                  </h4>
-                  <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md bg-slate-950 p-3 text-xs text-slate-400">
-                    {selected.full_transcript ?? 'Not transcribed yet.'}
-                  </pre>
-                </div>
-
-                <NotesPanel token={token} sessionId={selected.id} role="gm" players={players} />
               </div>
-            ) : (
-              <p className="text-sm text-slate-500">Create or select a session to get started.</p>
-            )}
+            </div>
+
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+              <h4 className="mb-3 text-sm font-semibold text-[var(--text)]">Party glance</h4>
+              {party.length === 0 ? (
+                <p className="text-sm text-[var(--text-faint)]">No players registered yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {party.map((member) => {
+                    const c = member.character
+                    const hpPct = c ? Math.max(0, Math.min(100, (c.hp_current / Math.max(c.hp_max, 1)) * 100)) : null
+                    return (
+                      <li key={member.user_id} className="text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-[var(--text)]">{member.username}</span>
+                          {c && (
+                            <span className="font-mono text-xs text-[var(--text-faint)]">
+                              {c.hp_current}/{c.hp_max}
+                            </span>
+                          )}
+                        </div>
+                        {c ? (
+                          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
+                            <div
+                              className="h-full"
+                              style={{
+                                width: `${hpPct}%`,
+                                background:
+                                  hpPct! > 50 ? 'var(--success)' : hpPct! > 20 ? 'var(--accent)' : 'var(--danger)',
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[var(--text-faint)]">
+                            {member.sync_error ?? 'No D&D Beyond character linked.'}
+                          </p>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {tab === 'party' && <PartyOverview token={token} />}
+        {tab === 'sessions' && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="space-y-3 lg:col-span-1">
+              <form onSubmit={handleCreateSession} className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                <input
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="Campaign name"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)]"
+                />
+                <input
+                  value={sessionNumber}
+                  onChange={(e) => setSessionNumber(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Session #"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)]"
+                />
+                <button
+                  type="submit"
+                  disabled={creating || !campaignName.trim() || !sessionNumber}
+                  className="w-full rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
+                >
+                  New session
+                </button>
+              </form>
 
-      {tab === 'bot' && <BotControlPanel token={token} activeSessionId={selectedId} />}
+              <ul className="space-y-1">
+                {sessions.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      onClick={() => setSelectedId(s.id)}
+                      className={`w-full rounded-md px-3 py-2 text-left text-sm ${
+                        selectedId === s.id ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-muted)] hover:bg-[var(--surface)]'
+                      }`}
+                    >
+                      <div className="font-medium">
+                        {s.campaign_name} - Session {s.session_number}
+                      </div>
+                      <div className="text-xs text-[var(--text-faint)]">
+                        {s.date} - {s.processing_status}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-      {tab === 'soundboard' && <SoundboardPanel token={token} />}
+            <div className="lg:col-span-2">
+              {selected ? (
+                <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-[var(--text)]">
+                      {selected.campaign_name} - Session {selected.session_number}
+                    </h3>
+                    <button
+                      onClick={() => handleProcess(selected.id)}
+                      disabled={selected.processing_status === 'processing'}
+                      className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--surface-2)] disabled:opacity-50"
+                    >
+                      {selected.processing_status === 'processing'
+                        ? 'Processing...'
+                        : selected.processing_status === 'complete'
+                          ? 'Re-process'
+                          : 'Transcribe + Summarize'}
+                    </button>
+                  </div>
 
-      {tab === 'settings' && <SettingsPanel token={token} />}
+                  {selected.processing_status === 'error' && (
+                    <p className="text-sm text-[var(--danger)]">{selected.processing_error}</p>
+                  )}
+
+                  <div>
+                    <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--text-faint)]">
+                      Master Summary (uncensored)
+                    </h4>
+                    <p className="whitespace-pre-wrap text-sm text-[var(--text-muted)]">
+                      {selected.gm_summary ?? 'Not generated yet.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--text-faint)]">
+                      Full Transcript
+                    </h4>
+                    <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md bg-[var(--bg)] p-3 text-xs text-[var(--text-muted)]">
+                      {selected.full_transcript ?? 'Not transcribed yet.'}
+                    </pre>
+                  </div>
+
+                  <NotesPanel token={token} sessionId={selected.id} role="gm" players={players} />
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--text-faint)]">Create or select a session to get started.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'party' && <PartyOverview token={token} />}
+
+        {tab === 'bot' && <BotControlPanel token={token} activeSessionId={selectedId} />}
+
+        {tab === 'soundboard' && <SoundboardPanel token={token} />}
+
+        {tab === 'settings' && <SettingsPanel token={token} focusKey={focusSettingsKey} />}
+      </div>
     </div>
   )
 }

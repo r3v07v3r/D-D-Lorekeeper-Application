@@ -22,26 +22,26 @@ export function SetupBanner({
   return (
     <div className="space-y-2">
       {required.length > 0 && (
-        <div className="rounded-md border border-red-800 bg-red-950/40 p-3">
+        <div className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)]/40 p-3">
           <div className="mb-1 flex items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold text-red-300">
+            <h4 className="text-sm font-semibold text-[var(--danger)]">
               Setup needed ({required.length}) - some features won't work yet
             </h4>
             <button
               type="button"
               onClick={() => onGoToSettings()}
-              className="shrink-0 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-500"
+              className="shrink-0 rounded-md bg-[var(--danger)] px-2 py-1 text-xs font-medium text-white hover:bg-[var(--danger-hover)]"
             >
               Go to Settings
             </button>
           </div>
-          <ul className="space-y-0.5 pl-1 text-xs text-red-200">
+          <ul className="space-y-0.5 pl-1 text-xs text-[var(--danger)]">
             {required.map((item) => (
               <li key={item.key}>
                 <button
                   type="button"
                   onClick={() => onGoToSettings(item.key)}
-                  className="text-left underline decoration-red-700 hover:text-red-100"
+                  className="text-left underline decoration-[var(--danger)] hover:text-[var(--danger-hover)]"
                 >
                   {item.message}
                 </button>
@@ -52,24 +52,24 @@ export function SetupBanner({
       )}
 
       {optional.length > 0 && (
-        <div className="rounded-md border border-slate-700 bg-slate-900 p-3">
+        <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3">
           <div className="mb-1 flex items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold text-slate-300">Optional setup ({optional.length})</h4>
+            <h4 className="text-sm font-semibold text-[var(--text-muted)]">Optional setup ({optional.length})</h4>
             <button
               type="button"
               onClick={() => onGoToSettings()}
-              className="shrink-0 rounded-md border border-slate-700 px-2 py-1 text-xs hover:bg-slate-800"
+              className="shrink-0 rounded-md border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)]"
             >
               Go to Settings
             </button>
           </div>
-          <ul className="space-y-0.5 pl-1 text-xs text-slate-400">
+          <ul className="space-y-0.5 pl-1 text-xs text-[var(--text-muted)]">
             {optional.map((item) => (
               <li key={item.key}>
                 <button
                   type="button"
                   onClick={() => onGoToSettings(item.key)}
-                  className="text-left underline decoration-slate-600 hover:text-slate-200"
+                  className="text-left underline decoration-[var(--text-faint)] hover:text-[var(--text)]"
                 >
                   {item.message}
                 </button>

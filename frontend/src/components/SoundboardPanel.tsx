@@ -129,34 +129,34 @@ export function SoundboardPanel({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-100">Soundboard</h3>
+        <h3 className="text-lg font-semibold text-[var(--text)]">Soundboard</h3>
         <button
           onClick={handleStop}
-          className="rounded-md border border-red-800 px-3 py-1.5 text-sm text-red-300 hover:bg-red-950"
+          className="rounded-md border border-[var(--danger)] px-3 py-1.5 text-sm text-[var(--danger)] hover:bg-[var(--danger-soft)]"
         >
           Stop playback
         </button>
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-[var(--text-faint)]">
         Sounds play into the Discord voice channel through the bot. Supported formats: mp3, wav, ogg,
         m4a, flac (max 8MB each).
       </p>
 
       {botStatus && !botStatus.connected && (
-        <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
+        <div className="rounded-md border border-[var(--accent)] bg-[var(--accent-soft)]/40 px-3 py-2 text-sm text-[var(--accent)]">
           The <strong>bot</strong> hasn't joined a voice channel yet - being in the channel yourself
           isn't enough, the bot needs to join too. Go to <strong>Bot Control</strong> and click Join.
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
-      <div className="flex gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+      <div className="flex gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
         <input
           value={pendingName}
           onChange={(e) => setPendingName(e.target.value)}
           placeholder="Clip name (optional - defaults to filename)"
-          className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+          className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)]"
         />
         <input
           ref={fileInputRef}
@@ -164,22 +164,22 @@ export function SoundboardPanel({ token }: { token: string }) {
           accept=".mp3,.wav,.ogg,.m4a,.flac,audio/*"
           onChange={handleFileChosen}
           disabled={uploading}
-          className="text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-indigo-500"
+          className="text-sm text-[var(--text-muted)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-[var(--accent-hover)]"
         />
       </div>
 
       {clips.length === 0 ? (
-        <p className="text-sm text-slate-500">No clips uploaded yet.</p>
+        <p className="text-sm text-[var(--text-faint)]">No clips uploaded yet.</p>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {clips.map((clip) => (
-            <div key={clip.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+            <div key={clip.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="truncate font-medium text-slate-100">{clip.name}</span>
+                <span className="truncate font-medium text-[var(--text)]">{clip.name}</span>
                 <button
                   onClick={() => handleDelete(clip.id)}
                   disabled={busyClipId === clip.id}
-                  className="text-xs text-slate-500 hover:text-red-400 disabled:opacity-50"
+                  className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -188,11 +188,11 @@ export function SoundboardPanel({ token }: { token: string }) {
                 onClick={() => handlePlay(clip.id)}
                 disabled={busyClipId === clip.id || !botStatus?.connected}
                 title={botStatus?.connected ? undefined : 'The bot needs to join a voice channel first (Bot Control tab)'}
-                className="mb-2 w-full rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                className="mb-2 w-full rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
               >
                 {busyClipId === clip.id ? 'Playing...' : 'Play'}
               </button>
-              <label className="flex items-center gap-2 text-xs text-slate-500">
+              <label className="flex items-center gap-2 text-xs text-[var(--text-faint)]">
                 Volume
                 <input
                   type="range"

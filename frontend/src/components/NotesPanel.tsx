@@ -61,14 +61,14 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Notes</h4>
+      <h4 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-faint)]">Notes</h4>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading notes...</p>
+        <p className="text-sm text-[var(--text-faint)]">Loading notes...</p>
       ) : notes.length === 0 ? (
-        <p className="text-sm text-slate-500">No notes yet.</p>
+        <p className="text-sm text-[var(--text-faint)]">No notes yet.</p>
       ) : (
         <ul className="space-y-2">
           {notes.map((note) => (
@@ -76,18 +76,18 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
               key={note.id}
               className={`rounded-lg border px-3 py-2 text-sm ${
                 note.is_private_gm
-                  ? 'border-amber-800 bg-amber-950/40 text-amber-100'
-                  : 'border-slate-800 bg-slate-900 text-slate-200'
+                  ? 'border-[var(--accent)] bg-[var(--accent-soft)]/40 text-[var(--text)]'
+                  : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text)]'
               }`}
             >
               {note.is_private_gm ? (
-                <div className="mb-1 text-xs uppercase tracking-wide text-amber-400">
+                <div className="mb-1 text-xs uppercase tracking-wide text-[var(--accent)]">
                   Secret{note.target_player_id ? ' - shared with one player' : ' - GM only'}
                 </div>
               ) : (
                 note.target_player_id &&
                 playerName(note.target_player_id) && (
-                  <div className="mb-1 text-xs uppercase tracking-wide text-slate-500">
+                  <div className="mb-1 text-xs uppercase tracking-wide text-[var(--text-faint)]">
                     About {playerName(note.target_player_id)}
                   </div>
                 )
@@ -98,16 +98,16 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
         </ul>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-2 border-t border-slate-800 pt-3">
+      <form onSubmit={handleSubmit} className="space-y-2 border-t border-[var(--border)] pt-3">
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Add a note..."
           rows={2}
-          className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-faint)] focus:border-[var(--accent)] focus:outline-none"
         />
         {role === 'gm' && (
-          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-muted)]">
             <label className="flex items-center gap-1.5">
               <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
               Secret (GM only)
@@ -119,7 +119,7 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
             <select
               value={targetPlayerId}
               onChange={(e) => setTargetPlayerId(e.target.value ? Number(e.target.value) : '')}
-              className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-[var(--text)]"
             >
               <option value="">{isPrivate ? 'GM only (no target player)' : 'Not about a specific player'}</option>
               {players.map((p) => (
@@ -133,7 +133,7 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
         <button
           type="submit"
           disabled={submitting || !content.trim()}
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {submitting ? 'Saving...' : 'Add note'}
         </button>
