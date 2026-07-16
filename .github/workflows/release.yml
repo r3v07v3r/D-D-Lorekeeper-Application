@@ -5,13 +5,15 @@
 #     a version bumped intentionally ahead of time (or the very first
 #     release) - build and publish it as-is.
 #   - If it already has a release, this merge needs a new version: bump it
-#     (patch by default) and push that bump straight to main. Pushing
-#     re-triggers this workflow; that second run sees the freshly bumped
-#     version has no release yet and proceeds straight to building it -
-#     so bumping never also builds in the same run (which would race
-#     against the build the bump's own push triggers) and there's no
-#     infinite loop (a version is only ever bumped once, the run right
-#     after always finds no release for it yet).
+#     (patch by default), push that bump straight to main for the repo's
+#     own history/next-run bookkeeping, and *continue building in this same
+#     run* using the bumped version - a push authenticated with the default
+#     GITHUB_TOKEN deliberately does NOT trigger other workflow runs (GitHub's
+#     built-in loop prevention), so waiting for a second, bump-triggered run
+#     to do the real build would just silently never happen. Learned this
+#     the hard way: the first version of this workflow bumped v1.2.0 to
+#     v1.3.0, pushed it, and then nothing built - the push never triggered
+#     anything.
 #   - The bump defaults to patch. Include "[minor]" or "[major]" anywhere
 #     in the merge commit message (e.g. in the PR title, since that's what
 #     `gh pr merge --merge` carries into the merge commit) to bump that
@@ -40,7 +42,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
-      should_release: ${{ steps.check.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
 
@@ -67,23 +68,23 @@ jobs:
             git add electron/package.json electron/package-lock.json
             git commit -m "chore(release): bump version to v$VERSION"
             git push
-
-            # This run's job is only to bump - the push above triggers a
-            # fresh run that builds the now-unreleased bumped version.
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
           else
             echo "No release for v$VERSION yet - building this version."
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   build-and-release:
     needs: check-version
-    if: needs.check-version.outputs.should_release == 'true'
     runs-on: windows-latest
     steps:
+      # Explicitly pins to main's current tip, not the commit that triggered
+      # this run - if check-version just bumped and pushed, that bump commit
+      # is what needs to be built, not the pre-bump commit this workflow
+      # actually started from.
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
