@@ -5,12 +5,15 @@ or "start recording" behaves identically regardless of which surface
 triggered it, and both surfaces share the same BotState (risk #7).
 """
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import discord
 
 from app.bot.recorder import VoiceRecorder
 from app.config import Settings
+from app.database import SessionLocal
+from app.models import SessionLog
 from app.runtime_config import RuntimeConfigStore
 from app.state import BotState
 
@@ -69,14 +72,40 @@ async def start_recording(bot_state: BotState, session_log_id: int, settings: Se
     bot_state.current_session_log_id = session_log_id
     bot_state.is_recording = True
 
+    # Stamps the real wall-clock recording window onto the SessionLog - see
+    # app/ai/pipeline.py, which uses this window to correlate the roll log
+    # (app/models.py:RollLogEntry) against this specific session rather than
+    # the whole campaign's roll history. Opens its own DB session (matching
+    # the pattern in app/ai/pipeline.py) since this isn't running inside a
+    # request's own session.
+    db = SessionLocal()
+    try:
+        log = db.get(SessionLog, session_log_id)
+        if log is not None:
+            log.recording_started_at = datetime.utcnow()
+            db.commit()
+    finally:
+        db.close()
+
 
 async def stop_recording(bot_state: BotState) -> None:
     if not bot_state.is_recording or bot_state.recorder is None:
         raise VoiceControlError("Not currently recording.")
+    session_log_id = bot_state.current_session_log_id
     await bot_state.recorder.stop()
     bot_state.recorder = None
     bot_state.is_recording = False
     bot_state.current_session_log_id = None
+
+    if session_log_id is not None:
+        db = SessionLocal()
+        try:
+            log = db.get(SessionLog, session_log_id)
+            if log is not None:
+                log.recording_ended_at = datetime.utcnow()
+                db.commit()
+        finally:
+            db.close()
 
 
 def play_clip(bot_state: BotState, file_path: Path, volume: float = 1.0) -> None:

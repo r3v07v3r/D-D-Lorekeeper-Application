@@ -68,6 +68,17 @@ class SessionLogCreate(BaseModel):
     date: date_type
 
 
+class HighlightPublic(BaseModel):
+    """One LLM-extracted notable moment from a session's transcript - see
+    app/ai/summarization.py:generate_highlights. Never fabricated: an empty
+    SessionLogPublic.highlights list means nothing notable was extracted
+    (or extraction wasn't attempted/failed), not "no data available."
+    """
+
+    category: str  # "damage" | "kill" | "death" | "critical" | "strange" | "other"
+    description: str
+
+
 class SessionLogPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -83,6 +94,7 @@ class SessionLogPublic(BaseModel):
     full_transcript: str | None = None
     gm_summary: str | None = None
     player_summary: str | None = None
+    highlights: list[HighlightPublic] = []
     processing_status: str = "pending"
     processing_error: str | None = None
 
