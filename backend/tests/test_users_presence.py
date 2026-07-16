@@ -81,3 +81,51 @@ def test_player_shows_connected_once_logged_in(client: TestClient):
 def test_presence_requires_authentication(client: TestClient):
     resp = client.get("/users/presence")
     assert resp.status_code == 401
+
+
+# ---- GET /users/voice-presence - real Discord voice presence ----
+#
+# BotState.voice_member_discord_ids (see app/state.py) is normally kept live
+# by app/bot/client.py's on_voice_state_update handler and seeded by
+# app/bot/controller.py:join_channel - no real Discord bot runs in these
+# tests, so these set it directly to exercise get_voice_presence's own
+# matching logic in isolation.
+
+
+def test_voice_presence_true_when_bot_state_reports_the_users_discord_id(client: TestClient):
+    from app.main import app
+
+    resp = client.post("/users", json={"username": "gm", "role": "gm", "discord_id": "111"})
+    gm_id = resp.json()["id"]
+    gm_token = _login(client, gm_id)
+
+    app.state.bot_state.voice_member_discord_ids = {"111"}
+
+    presence = client.get("/users/voice-presence", headers={"Authorization": f"Bearer {gm_token}"}).json()
+    assert presence[str(gm_id)] is True
+
+
+def test_voice_presence_false_when_not_in_bot_states_set(client: TestClient):
+    from app.main import app
+
+    resp = client.post("/users", json={"username": "gm", "role": "gm", "discord_id": "222"})
+    gm_id = resp.json()["id"]
+    gm_token = _login(client, gm_id)
+
+    app.state.bot_state.voice_member_discord_ids = set()
+
+    presence = client.get("/users/voice-presence", headers={"Authorization": f"Bearer {gm_token}"}).json()
+    assert presence[str(gm_id)] is False
+
+
+def test_voice_presence_false_with_no_discord_id_on_file(client: TestClient):
+    gm_id = _register(client, "gm", "gm")
+    gm_token = _login(client, gm_id)
+
+    presence = client.get("/users/voice-presence", headers={"Authorization": f"Bearer {gm_token}"}).json()
+    assert presence[str(gm_id)] is False
+
+
+def test_voice_presence_requires_authentication(client: TestClient):
+    resp = client.get("/users/voice-presence")
+    assert resp.status_code == 401

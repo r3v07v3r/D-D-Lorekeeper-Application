@@ -19,7 +19,9 @@ from sqlalchemy.orm import Session
 from app.auth import SessionRecord, get_current_user, get_session_store, require_network_access
 from app.database import get_db
 from app.models import User
+from app.routers.bot_control import get_bot_state
 from app.schemas import UserCreate, UserPublic
+from app.state import BotState
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -42,6 +44,25 @@ def get_presence(
     """
     connected = get_session_store(request).connected_user_ids()
     return {user.id: user.id in connected for user in db.query(User).all()}
+
+
+@router.get("/voice-presence")
+def get_voice_presence(
+    db: Session = Depends(get_db),
+    bot_state: BotState = Depends(get_bot_state),
+    _current: SessionRecord = Depends(get_current_user),
+) -> dict[int, bool]:
+    """Which users are currently in the same Discord voice channel as the
+    bot - real Discord-voice presence, distinct from get_presence's
+    app-connectivity check above. Matches on User.discord_id against
+    BotState.voice_member_discord_ids (kept live by on_voice_state_update -
+    see app/bot/client.py). A user with no discord_id on file, or while the
+    bot isn't connected to any channel, always reads False.
+    """
+    return {
+        user.id: user.discord_id is not None and user.discord_id in bot_state.voice_member_discord_ids
+        for user in db.query(User).all()
+    }
 
 
 @router.post(

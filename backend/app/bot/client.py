@@ -25,6 +25,25 @@ def create_bot(bot_state: BotState) -> discord.Bot:
     async def on_ready() -> None:
         logger.info("Discord bot logged in as %s", bot.user)
 
+    @bot.event
+    async def on_voice_state_update(
+        member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+    ) -> None:
+        """Keeps BotState.voice_member_discord_ids in sync with who's
+        actually in the bot's own voice channel - real Discord-voice
+        presence (see app/routers/users.py:get_voice_presence), as opposed
+        to the app-connectivity presence SessionStore already tracks.
+        Recomputes the full membership from the channel itself rather than
+        patching the set incrementally, since that's correct regardless of
+        which side of the join/leave/move this event represents.
+        """
+        if bot_state.voice_client is None or not bot_state.voice_client.is_connected():
+            return
+        channel = bot_state.voice_client.channel
+        if before.channel != channel and after.channel != channel:
+            return  # unrelated to the channel the bot is actually in
+        bot_state.voice_member_discord_ids = {str(m.id) for m in channel.members if not m.bot}
+
     register_voice_cog(bot, bot_state)
     return bot
 

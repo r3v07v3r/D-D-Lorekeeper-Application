@@ -6,6 +6,7 @@ import {
   getPartyOverview,
   getSettings,
   getUserPresence,
+  getVoicePresence,
   listSessions,
   listUsers,
   processSession,
@@ -19,12 +20,13 @@ import { HomeIcon, LiveIcon, PartyIcon, SessionsIcon, SettingsIcon } from '../co
 import { SettingsPanel } from '../components/SettingsPanel'
 import { SetupBanner } from '../components/SetupBanner'
 import { SoundboardPanel } from '../components/SoundboardPanel'
+import { formatDuration } from '../utils/formatDuration'
 import type { CampaignPublic, PartyMemberPublic, SessionLogPublic, SetupItem, UserPublic } from '../types/api'
 
 type Tab = 'home' | 'sessions' | 'party' | 'bot' | 'soundboard' | 'settings'
 
 export function GMDashboard() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const [tab, setTab] = useState<Tab>('home')
   const [sessions, setSessions] = useState<SessionLogPublic[]>([])
   const [players, setPlayers] = useState<UserPublic[]>([])
@@ -35,6 +37,7 @@ export function GMDashboard() {
   const [botConfigured, setBotConfigured] = useState(false)
   const [focusSettingsKey, setFocusSettingsKey] = useState<string | null>(null)
   const [presence, setPresence] = useState<Record<string, boolean>>({})
+  const [voicePresence, setVoicePresence] = useState<Record<string, boolean>>({})
 
   // undefined = still loading; null = loaded, nothing active yet (shows the
   // picker); a CampaignPublic once one is selected.
@@ -99,6 +102,27 @@ export function GMDashboard() {
       getUserPresence(token as string)
         .then((p) => {
           if (!cancelled) setPresence(p)
+        })
+        .catch(() => {})
+    }
+    refresh()
+    const interval = setInterval(refresh, 5_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    // Real Discord voice-channel presence, distinct from the app-connectivity
+    // presence above - see backend/app/routers/users.py:get_voice_presence.
+    // Same in-memory-lookup, no-I/O-cost polling cadence as that one.
+    let cancelled = false
+    function refresh() {
+      getVoicePresence(token as string)
+        .then((p) => {
+          if (!cancelled) setVoicePresence(p)
         })
         .catch(() => {})
     }
@@ -218,12 +242,19 @@ export function GMDashboard() {
       <ul className="space-y-1">
         {players.map((p) => {
           const online = presence[String(p.id)] === true
+          const inVoice = voicePresence[String(p.id)] === true
           return (
             <li key={p.id} className="flex items-center gap-2 text-xs" title={online ? 'Connected' : 'Offline'}>
               <span
                 className={`h-2 w-2 shrink-0 rounded-full ${online ? 'bg-[var(--success)]' : 'bg-[var(--text-faint)]'}`}
               />
               <span className={online ? 'text-[var(--text)]' : 'text-[var(--text-faint)]'}>{p.username}</span>
+              {inVoice && (
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]"
+                  title="In the bot's voice channel"
+                />
+              )}
             </li>
           )
         })}
@@ -324,6 +355,14 @@ export function GMDashboard() {
                   )}
                 </div>
               </div>
+
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                <h4 className="mb-1 text-sm font-semibold text-[var(--text)]">Your time in Lorekeeper</h4>
+                <p className="text-sm text-[var(--text-muted)]">
+                  {formatDuration(user?.total_seconds_active ?? 0)}
+                  <span className="ml-1 text-xs text-[var(--text-faint)]">across past sessions</span>
+                </p>
+              </div>
             </div>
 
             <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -335,6 +374,7 @@ export function GMDashboard() {
                   {party.map((member) => {
                     const c = member.character
                     const hpPct = c ? Math.max(0, Math.min(100, (c.hp_current / Math.max(c.hp_max, 1)) * 100)) : null
+                    const account = players.find((p) => p.id === member.user_id)
                     return (
                       <li key={member.user_id} className="text-sm">
                         <div className="flex items-center justify-between">
@@ -345,6 +385,11 @@ export function GMDashboard() {
                             </span>
                           )}
                         </div>
+                        {account && (
+                          <p className="text-xs text-[var(--text-faint)]">
+                            {formatDuration(account.total_seconds_active)} in Lorekeeper
+                          </p>
+                        )}
                         {c ? (
                           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
                             <div

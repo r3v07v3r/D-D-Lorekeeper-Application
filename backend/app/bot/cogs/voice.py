@@ -10,7 +10,6 @@ import discord
 from discord.ext import commands
 
 from app.bot import controller
-from app.config import get_settings
 from app.database import SessionLocal
 from app.models import SessionLog
 from app.state import BotState
@@ -48,12 +47,29 @@ class VoiceCog(commands.Cog):
     async def record_start(
         self,
         ctx: discord.ApplicationContext,
-        campaign_name: discord.Option(str, "Campaign name"),
         session_number: discord.Option(int, "Session number"),
     ) -> None:
+        # Local import to dodge a circular import: app.main imports
+        # app.bot.client at module load time, which imports this module -
+        # importing app.main back at module level here would cycle. By the
+        # time a slash command actually runs, app.main is long since loaded.
+        from app.main import app as fastapi_app
+
+        runtime_config = fastapi_app.state.runtime_config
+        if not runtime_config.active_campaign_id:
+            await ctx.respond(
+                "No active campaign is selected yet - pick one from the GM's dashboard first.",
+                ephemeral=True,
+            )
+            return
+
         db = SessionLocal()
         try:
-            log = SessionLog(campaign_name=campaign_name, session_number=session_number, date=discord.utils.utcnow().date())
+            log = SessionLog(
+                campaign_id=runtime_config.active_campaign_id,
+                session_number=session_number,
+                date=discord.utils.utcnow().date(),
+            )
             db.add(log)
             db.commit()
             db.refresh(log)
@@ -66,11 +82,11 @@ class VoiceCog(commands.Cog):
             db.close()
 
         try:
-            await controller.start_recording(self.bot_state, session_log_id, get_settings())
+            await controller.start_recording(self.bot_state, session_log_id, runtime_config)
         except controller.VoiceControlError as exc:
             await ctx.respond(str(exc), ephemeral=True)
             return
-        await ctx.respond(f"Recording started for session {session_number} ({campaign_name}).")
+        await ctx.respond(f"Recording started for session {session_number}.")
 
     @discord.slash_command(name="lk_record_stop", description="Stop recording the current session")
     async def record_stop(self, ctx: discord.ApplicationContext) -> None:

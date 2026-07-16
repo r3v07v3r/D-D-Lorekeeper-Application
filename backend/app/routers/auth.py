@@ -13,6 +13,8 @@ closed by require_network_access: a campaign passphrase (set by the GM in
 Settings) gates this endpoint once the backend is reachable beyond the GM's
 own machine - see app.auth for the full reasoning.
 """
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -36,9 +38,24 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(request: Request, current: SessionRecord = Depends(get_current_user)) -> None:
+def logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    current: SessionRecord = Depends(get_current_user),
+) -> None:
     store = get_session_store(request)
-    store.delete(current.token)
+    record = store.delete(current.token)
+    if record is not None:
+        # Checkpoints this session's connected time onto the user's running
+        # total (see User.total_seconds_active) - a session that never
+        # cleanly logs out (app crash, force-quit) simply doesn't get this
+        # checkpoint, the same acceptable v1 limitation as other
+        # best-effort-on-clean-shutdown behavior in this app.
+        user = db.get(User, record.user_id)
+        if user is not None:
+            elapsed = max(0.0, time.monotonic() - record.created_at)
+            user.total_seconds_active += round(elapsed)
+            db.commit()
 
 
 @router.get("/me", response_model=UserPublic)
