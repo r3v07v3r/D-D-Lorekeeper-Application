@@ -1,0 +1,4 @@
+# Test-only dependency, not needed at runtime or to build the packaged app -
+# kept separate from requirements.txt/requirements-build.txt for the same
+# reason those are split out (see requirements-build.txt).
+pytest==9.1.1

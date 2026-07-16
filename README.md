@@ -178,7 +178,7 @@ npm install
 npm start
 ```
 
-Tests: `cd backend && venv/Scripts/python -m pytest tests/`
+Tests: `cd backend && venv/Scripts/pip install -r requirements-dev.txt && venv/Scripts/python -m pytest`
 
 Database migrations use Alembic (`backend/migrations/`). After changing models:
 `venv/Scripts/alembic revision --autogenerate -m "describe change"` — migrations run
