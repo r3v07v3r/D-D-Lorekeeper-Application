@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { GMDashboard } from './pages/GMDashboard'
 import { PlayerDashboard } from './pages/PlayerDashboard'
+import { BotPanelWindow } from './pages/BotPanelWindow'
 import { ThemeProvider } from './theme/ThemeContext'
 
 // HashRouter (not BrowserRouter) because this app is ultimately served from
@@ -31,6 +32,10 @@ export default function App() {
           <Routes>
             <Route path="/" element={<RootRoute />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            {/* No Layout wrapper - the detached Bot Control window (see
+                electron/main.js:openBotPanelWindow) is deliberately small and
+                chrome-free, not a second copy of the full dashboard shell. */}
+            <Route path="/bot-panel" element={<BotPanelWindow />} />
           </Routes>
         </HashRouter>
       </AuthProvider>

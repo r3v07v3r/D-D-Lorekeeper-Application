@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   deleteSoundClip,
   getBotStatus,
+  getSoundClipAudio,
   listSoundClips,
   playSoundClip,
   stopSoundClip,
@@ -9,6 +10,8 @@ import {
   uploadSoundClip,
 } from '../api/resources'
 import type { BotStatusResponse, SoundClipPublic } from '../types/api'
+
+type PlaybackMode = 'bot' | 'speakers'
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -32,6 +35,15 @@ export function SoundboardPanel({ token }: { token: string }) {
   const [busyClipId, setBusyClipId] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingName, setPendingName] = useState('')
+  // "speakers" plays the clip locally through this computer's own audio
+  // output instead of relaying it through the bot - useful with no bot
+  // configured yet, or for a GM who'd rather it ride along on their own open
+  // mic/Discord call the way playing music from a phone near a mic already
+  // works, just automated. Defaults to speakers when there's no bot
+  // connected yet, since "bot" mode cannot work at all in that state.
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('bot')
+  const modeInitialized = useRef(false)
+  const localAudioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     refresh()
@@ -55,7 +67,14 @@ export function SoundboardPanel({ token }: { token: string }) {
 
   async function refreshBotStatus() {
     try {
-      setBotStatus(await getBotStatus(token))
+      const status = await getBotStatus(token)
+      setBotStatus(status)
+      // Picks a sensible starting mode once, based on whether the bot is
+      // usable at all - never overrides a GM's own choice on later polls.
+      if (!modeInitialized.current) {
+        modeInitialized.current = true
+        setPlaybackMode(status.connected ? 'bot' : 'speakers')
+      }
     } catch {
       // Bot Control tab already surfaces connection errors - avoid a
       // redundant/competing error message here.
@@ -84,10 +103,25 @@ export function SoundboardPanel({ token }: { token: string }) {
     }
   }
 
-  async function handlePlay(clipId: number) {
-    setBusyClipId(clipId)
+  async function handlePlay(clip: SoundClipPublic) {
+    setBusyClipId(clip.id)
     try {
-      await playSoundClip(token, clipId)
+      if (playbackMode === 'speakers') {
+        const { content_base64, mime_type } = await getSoundClipAudio(token, clip.id)
+        const bytes = Uint8Array.from(atob(content_base64), (c) => c.charCodeAt(0))
+        const url = URL.createObjectURL(new Blob([bytes], { type: mime_type }))
+        const audio = localAudioRef.current
+        if (audio) {
+          audio.src = url
+          // HTML5 <audio> only goes up to 1.0; the volume slider allows up
+          // to 1.5 for bot playback, which mixes into a full Discord voice
+          // stream rather than a single local output device.
+          audio.volume = Math.min(clip.volume, 1)
+          await audio.play()
+        }
+      } else {
+        await playSoundClip(token, clip.id)
+      }
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not play that clip.')
@@ -98,6 +132,10 @@ export function SoundboardPanel({ token }: { token: string }) {
 
   async function handleStop() {
     try {
+      if (localAudioRef.current) {
+        localAudioRef.current.pause()
+        localAudioRef.current.currentTime = 0
+      }
       await stopSoundClip(token)
       setError(null)
     } catch (err) {
@@ -137,17 +175,50 @@ export function SoundboardPanel({ token }: { token: string }) {
           Stop playback
         </button>
       </div>
+
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-[var(--text-faint)]">Play through</span>
+        <div className="inline-flex overflow-hidden rounded-md border border-[var(--border)]">
+          <button
+            onClick={() => setPlaybackMode('bot')}
+            className={
+              'px-3 py-1 ' +
+              (playbackMode === 'bot'
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]')
+            }
+          >
+            Discord bot
+          </button>
+          <button
+            onClick={() => setPlaybackMode('speakers')}
+            className={
+              'px-3 py-1 ' +
+              (playbackMode === 'speakers'
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]')
+            }
+          >
+            My speakers
+          </button>
+        </div>
+      </div>
       <p className="text-xs text-[var(--text-faint)]">
-        Sounds play into the Discord voice channel through the bot. Supported formats: mp3, wav, ogg,
-        m4a, flac (max 8MB each).
+        {playbackMode === 'bot'
+          ? 'Sounds play into the Discord voice channel through the bot.'
+          : "Sounds play out loud on this computer, riding along on your own open mic/call the same way playing music from a phone near a mic would."}{' '}
+        Supported formats: mp3, wav, ogg, m4a, flac (max 8MB each).
       </p>
 
-      {botStatus && !botStatus.connected && (
+      {playbackMode === 'bot' && botStatus && !botStatus.connected && (
         <div className="rounded-md border border-[var(--accent)] bg-[var(--accent-soft)]/40 px-3 py-2 text-sm text-[var(--accent)]">
           The <strong>bot</strong> hasn't joined a voice channel yet - being in the channel yourself
-          isn't enough, the bot needs to join too. Go to <strong>Bot Control</strong> and click Join.
+          isn't enough, the bot needs to join too. Go to <strong>Bot Control</strong> and click Join,
+          or switch to <strong>My speakers</strong> above.
         </div>
       )}
+
+      <audio ref={localAudioRef} className="hidden" />
 
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
@@ -185,9 +256,13 @@ export function SoundboardPanel({ token }: { token: string }) {
                 </button>
               </div>
               <button
-                onClick={() => handlePlay(clip.id)}
-                disabled={busyClipId === clip.id || !botStatus?.connected}
-                title={botStatus?.connected ? undefined : 'The bot needs to join a voice channel first (Bot Control tab)'}
+                onClick={() => handlePlay(clip)}
+                disabled={busyClipId === clip.id || (playbackMode === 'bot' && !botStatus?.connected)}
+                title={
+                  playbackMode === 'bot' && !botStatus?.connected
+                    ? 'The bot needs to join a voice channel first (Bot Control tab), or switch to My speakers above'
+                    : undefined
+                }
                 className="mb-2 w-full rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
               >
                 {busyClipId === clip.id ? 'Playing...' : 'Play'}

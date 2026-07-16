@@ -142,3 +142,8 @@ export interface SoundClipUpdate {
   name?: string
   volume?: number
 }
+
+export interface SoundClipAudio {
+  content_base64: string
+  mime_type: string
+}

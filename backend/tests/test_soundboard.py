@@ -175,6 +175,31 @@ def test_upload_list_update_delete_roundtrip(client: TestClient):
     assert resp.json() == []
 
 
+def test_get_clip_audio_roundtrips_the_uploaded_bytes(client: TestClient):
+    token = _login_as_gm(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    original_b64 = _tiny_wav_base64()
+
+    resp = client.post(
+        "/soundboard",
+        headers=headers,
+        json={"name": "Thunder", "filename": "thunder.wav", "content_base64": original_b64},
+    )
+    clip_id = resp.json()["id"]
+
+    resp = client.get(f"/soundboard/{clip_id}/audio", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["mime_type"] == "audio/wav"
+    assert body["content_base64"] == original_b64
+
+
+def test_get_clip_audio_404_for_unknown_clip(client: TestClient):
+    token = _login_as_gm(client)
+    resp = client.get("/soundboard/999/audio", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 404
+
+
 def test_upload_rejects_bad_extension(client: TestClient):
     token = _login_as_gm(client)
     headers = {"Authorization": f"Bearer {token}"}

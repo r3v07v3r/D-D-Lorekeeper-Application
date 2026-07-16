@@ -32,6 +32,7 @@ export function GMDashboard() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [setupItems, setSetupItems] = useState<SetupItem[]>([])
+  const [botConfigured, setBotConfigured] = useState(false)
   const [focusSettingsKey, setFocusSettingsKey] = useState<string | null>(null)
   const [presence, setPresence] = useState<Record<string, boolean>>({})
 
@@ -73,7 +74,10 @@ export function GMDashboard() {
     function refresh() {
       getSettings(token as string)
         .then((s) => {
-          if (!cancelled) setSetupItems(s.setup_items)
+          if (!cancelled) {
+            setSetupItems(s.setup_items)
+            setBotConfigured(s.discord_bot_token_set)
+          }
         })
         .catch(() => {})
     }
@@ -308,6 +312,16 @@ export function GMDashboard() {
                   >
                     Open Soundboard
                   </button>
+                  {window.lorekeeper && botConfigured && (
+                    <button
+                      type="button"
+                      onClick={() => window.lorekeeper?.openBotPanel()}
+                      title="Opens Bot Control + Soundboard in their own window, e.g. to keep on a second monitor"
+                      className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--surface-2)]"
+                    >
+                      Detach Bot Control window
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

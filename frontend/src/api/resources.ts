@@ -11,6 +11,7 @@ import type {
   SessionLogPublic,
   SettingsPublic,
   SettingsUpdate,
+  SoundClipAudio,
   SoundClipPublic,
   SoundClipUpdate,
   SoundClipUpload,
@@ -77,3 +78,5 @@ export const deleteSoundClip = (token: string, clipId: number) => api.delete<voi
 export const playSoundClip = (token: string, clipId: number) =>
   api.post<void>(`/soundboard/${clipId}/play`, undefined, token)
 export const stopSoundClip = (token: string) => api.post<void>('/soundboard/stop', undefined, token)
+export const getSoundClipAudio = (token: string, clipId: number) =>
+  api.get<SoundClipAudio>(`/soundboard/${clipId}/audio`, token)
