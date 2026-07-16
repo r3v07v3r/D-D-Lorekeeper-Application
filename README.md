@@ -16,9 +16,14 @@ computers and connect to the GM with a one-line **share code**.
 ## Installing (everyone: GM and players)
 
 1. Download `Lorekeeper-Setup-<version>.exe` from the
-   [latest release](https://github.com/R3v07v3R/D-D-Lorekeeper-Application/releases/latest)
-   and run it.
-   - The installer is not code-signed yet, so Windows SmartScreen will warn you.
+   [latest release](https://github.com/R3v07v3R/D-D-Lorekeeper-Application/releases/latest).
+   The installer isn't code-signed yet (that costs money and requires identity
+   verification from a certificate authority), so expect two separate warnings - neither
+   means anything is actually wrong, just that Windows doesn't yet recognize the file:
+   - **Your browser** may block the download itself ("Make sure you trust this file...").
+     Click the small arrow next to Delete/Cancel and choose **Keep** (Edge) or the
+     equivalent "Keep anyway" option (Chrome shows a similar prompt).
+   - **Windows** will warn again the first time you run it ("Windows protected your PC").
      Click **More info → Run anyway**.
 2. Install **ffmpeg** (required for recording, transcription, and the soundboard).
    The quickest way on Windows is to open a terminal and run:
