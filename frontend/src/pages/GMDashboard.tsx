@@ -19,6 +19,7 @@ import { PartyOverview } from '../components/PartyOverview'
 import { RollLog } from '../components/RollLog'
 import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
 import { CombatIcon, HomeIcon, LiveIcon, PartyIcon, SessionsIcon, SettingsIcon } from '../components/icons'
+import { SessionHighlights } from '../components/SessionHighlights'
 import { SettingsPanel } from '../components/SettingsPanel'
 import { SetupBanner } from '../components/SetupBanner'
 import { SoundboardPanel } from '../components/SoundboardPanel'
@@ -481,6 +482,8 @@ export function GMDashboard() {
                   {selected.processing_status === 'error' && (
                     <p className="text-sm text-[var(--danger)]">{selected.processing_error}</p>
                   )}
+
+                  <SessionHighlights highlights={selected.highlights} />
 
                   <div>
                     <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--text-faint)]">

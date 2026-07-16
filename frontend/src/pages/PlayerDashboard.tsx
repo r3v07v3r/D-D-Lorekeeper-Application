@@ -8,6 +8,7 @@ import { CharacterIcon, DiceIcon, SessionsIcon } from '../components/icons'
 import { DiceRoller } from '../components/DiceRoller'
 import { NotesPanel } from '../components/NotesPanel'
 import { RollLog } from '../components/RollLog'
+import { SessionHighlights } from '../components/SessionHighlights'
 import { Sidebar, type SidebarNavItem } from '../components/Sidebar'
 import { formatDuration } from '../utils/formatDuration'
 import type { CampaignPublic, CharacterPublic, SessionLogPublic } from '../types/api'
@@ -150,6 +151,7 @@ export function PlayerDashboard() {
                   <h3 className="text-lg font-semibold text-[var(--text)]">
                     {selected.campaign_name} - Session {selected.session_number}
                   </h3>
+                  <SessionHighlights highlights={selected.highlights} />
                   <div>
                     <h4 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[var(--text-faint)]">Recap</h4>
                     <p className="whitespace-pre-wrap text-sm text-[var(--text-muted)]">

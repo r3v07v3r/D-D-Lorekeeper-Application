@@ -56,6 +56,22 @@ class SessionLog(Base):
     full_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
     gm_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     player_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # [{"category": "damage"|"kill"|"death"|"critical"|"strange"|"other",
+    #   "description": str}, ...] - LLM-extracted from the transcript (see
+    # app/ai/pipeline.py), grounded against real logged rolls
+    # (RollLogEntry) that fall within recording_started_at/recording_ended_at
+    # when both are set. Never fabricated placeholder content - empty if
+    # extraction produced nothing or wasn't attempted.
+    highlights: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Stamped by app/bot/controller.py's start_recording/stop_recording -
+    # the real wall-clock window this session's recording covered, used to
+    # scope which RollLogEntry rows (app/models.py) belong to this specific
+    # session rather than the whole campaign's roll history. Both remain
+    # None for a session whose recording predates this field, or one
+    # created without ever actually recording (e.g. a manually-added log).
+    recording_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    recording_ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Tracks the async transcription/summarization job (app.ai.pipeline).
     # "pending" (no recording processed yet) -> "processing" -> "complete" | "error".

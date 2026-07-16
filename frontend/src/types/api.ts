@@ -24,6 +24,11 @@ export interface CampaignPublic {
   created_at: string
 }
 
+export interface HighlightPublic {
+  category: 'damage' | 'kill' | 'death' | 'critical' | 'strange' | 'other'
+  description: string
+}
+
 export interface SessionLogPublic {
   id: number
   campaign_id: number
@@ -33,6 +38,7 @@ export interface SessionLogPublic {
   full_transcript: string | null
   gm_summary: string | null
   player_summary: string | null
+  highlights: HighlightPublic[]
   processing_status: 'pending' | 'processing' | 'complete' | 'error'
   processing_error: string | null
 }
