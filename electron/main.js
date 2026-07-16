@@ -291,6 +291,31 @@ async function createWindow() {
     },
   })
 
+  // The dashboard's Settings tab links out to real docs (Discord Developer
+  // Portal, Ollama). Electron denies target="_blank"/window.open navigation
+  // by default with no handler configured, so without this those links would
+  // silently do nothing instead of opening the system browser.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  // Plain (non-_blank) links to an external http(s) origin would otherwise
+  // navigate this same window away from the dashboard - redirect those to
+  // the system browser too, but only for genuinely external destinations so
+  // this doesn't interfere with loading the app's own dev server/file:// UI.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const isOwnFrontend = app.isPackaged
+      ? url.startsWith('file://')
+      : url.startsWith('http://127.0.0.1:5173')
+    if (!isOwnFrontend && (url.startsWith('http://') || url.startsWith('https://'))) {
+      event.preventDefault()
+      shell.openExternal(url)
+    }
+  })
+
   if (app.isPackaged) {
     await mainWindow.loadFile(frontendIndexPath())
   } else {

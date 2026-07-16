@@ -5,10 +5,9 @@ to transcribe - the triggering HTTP request should not block on it.
 """
 import logging
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.ai.summarization import generate_gm_summary, generate_player_summary
+from app.ai.summarization import build_llm_client, generate_gm_summary, generate_player_summary
 from app.ai.transcript_builder import build_session_transcript
 from app.config import Settings
 from app.database import SessionLocal
@@ -38,14 +37,13 @@ def process_session(session_log_id: int, settings: Settings | RuntimeConfigStore
         if not session_dir.exists():
             raise FileNotFoundError(f"No recordings found for session {session_log_id} at {session_dir}")
 
-        client = OpenAI(api_key=settings.openai_api_key)
-
-        transcript = build_session_transcript(session_dir, db, client, settings.whisper_model)
+        transcript = build_session_transcript(session_dir, db, settings)
         if not transcript.strip():
             raise ValueError("Transcription produced no text - check that recording chunks exist and are audible")
 
-        gm_summary = generate_gm_summary(transcript, client, settings.summarization_model)
-        player_summary = generate_player_summary(transcript, client, settings.summarization_model)
+        llm_client = build_llm_client(settings)
+        gm_summary = generate_gm_summary(transcript, llm_client, settings.summarization_model)
+        player_summary = generate_player_summary(transcript, llm_client, settings.summarization_model)
 
         log.full_transcript = transcript
         log.gm_summary = gm_summary

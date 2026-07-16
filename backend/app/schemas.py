@@ -99,6 +99,10 @@ class SettingsUpdate(BaseModel):
     openai_api_key: str | None = None
     whisper_model: str | None = None
     summarization_model: str | None = None
+    llm_provider: str | None = None
+    ollama_base_url: str | None = None
+    transcription_provider: str | None = None
+    local_whisper_model_size: str | None = None
     recording_chunk_minutes: int | None = None
     dndbeyond_sync_interval_minutes: int | None = None
     campaign_passphrase: str | None = None
@@ -109,6 +113,10 @@ class SettingsPublic(BaseModel):
     openai_api_key_set: bool
     whisper_model: str
     summarization_model: str
+    llm_provider: str
+    ollama_base_url: str
+    transcription_provider: str
+    local_whisper_model_size: str
     recording_chunk_minutes: int
     dndbeyond_sync_interval_minutes: int
     bot_running: bool

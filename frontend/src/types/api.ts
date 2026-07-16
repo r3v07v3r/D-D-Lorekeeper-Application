@@ -82,6 +82,10 @@ export interface SettingsPublic {
   openai_api_key_set: boolean
   whisper_model: string
   summarization_model: string
+  llm_provider: string
+  ollama_base_url: string
+  transcription_provider: string
+  local_whisper_model_size: string
   recording_chunk_minutes: number
   dndbeyond_sync_interval_minutes: number
   bot_running: boolean
@@ -97,6 +101,10 @@ export interface SettingsUpdate {
   openai_api_key?: string
   whisper_model?: string
   summarization_model?: string
+  llm_provider?: string
+  ollama_base_url?: string
+  transcription_provider?: string
+  local_whisper_model_size?: string
   recording_chunk_minutes?: number
   dndbeyond_sync_interval_minutes?: number
   campaign_passphrase?: string

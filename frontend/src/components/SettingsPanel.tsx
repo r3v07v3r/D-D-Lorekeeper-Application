@@ -19,6 +19,11 @@ export function SettingsPanel({ token }: { token: string }) {
   const [summarizationModel, setSummarizationModel] = useState('')
   const [chunkMinutes, setChunkMinutes] = useState('')
   const [syncMinutes, setSyncMinutes] = useState('')
+  const [showBotWalkthrough, setShowBotWalkthrough] = useState(false)
+  const [llmProvider, setLlmProvider] = useState<'openai' | 'ollama'>('openai')
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState('')
+  const [transcriptionProvider, setTranscriptionProvider] = useState<'openai' | 'local'>('openai')
+  const [localWhisperModelSize, setLocalWhisperModelSize] = useState('small')
 
   const [shareCodePassphraseInput, setShareCodePassphraseInput] = useState('')
   const [shareCode, setShareCode] = useState('')
@@ -36,6 +41,10 @@ export function SettingsPanel({ token }: { token: string }) {
       setSummarizationModel(s.summarization_model)
       setChunkMinutes(String(s.recording_chunk_minutes))
       setSyncMinutes(String(s.dndbeyond_sync_interval_minutes))
+      setLlmProvider(s.llm_provider === 'ollama' ? 'ollama' : 'openai')
+      setOllamaBaseUrl(s.ollama_base_url)
+      setTranscriptionProvider(s.transcription_provider === 'local' ? 'local' : 'openai')
+      setLocalWhisperModelSize(s.local_whisper_model_size)
       setError(null)
     } catch {
       setError('Could not load settings.')
@@ -53,6 +62,10 @@ export function SettingsPanel({ token }: { token: string }) {
         campaign_passphrase: passphrase.trim() || undefined,
         whisper_model: whisperModel.trim() || undefined,
         summarization_model: summarizationModel.trim() || undefined,
+        llm_provider: llmProvider,
+        ollama_base_url: ollamaBaseUrl.trim() || undefined,
+        transcription_provider: transcriptionProvider,
+        local_whisper_model_size: localWhisperModelSize,
         recording_chunk_minutes: chunkMinutes ? Number(chunkMinutes) : undefined,
         dndbeyond_sync_interval_minutes: syncMinutes ? Number(syncMinutes) : undefined,
       })
@@ -92,6 +105,49 @@ export function SettingsPanel({ token }: { token: string }) {
           placeholder={settings.discord_bot_token_set ? 'Leave blank to keep current token' : 'Paste your bot token'}
           className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
         />
+        <button
+          type="button"
+          onClick={() => setShowBotWalkthrough((v) => !v)}
+          className="mt-1 text-xs text-indigo-400 hover:text-indigo-300"
+        >
+          {showBotWalkthrough ? 'Hide' : "Don't have a bot yet? Show me how to make one"}
+        </button>
+        {showBotWalkthrough && (
+          <ol className="mt-2 list-decimal space-y-2 rounded-md border border-slate-700 bg-slate-950 p-3 pl-7 text-xs text-slate-300">
+            <li>
+              Go to the{' '}
+              <a
+                href="https://discord.com/developers/applications"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-400 underline hover:text-indigo-300"
+              >
+                Discord Developer Portal
+              </a>
+              , click <strong>New Application</strong>, and give it a name (e.g. "Lorekeeper").
+            </li>
+            <li>
+              Open the <strong>Bot</strong> tab on the left. Click <strong>Reset Token</strong> (or{' '}
+              <strong>Copy</strong> if one already exists) to get your bot token, then paste it into the
+              field above.
+            </li>
+            <li>
+              On the same Bot page, scroll to <strong>Privileged Gateway Intents</strong> and enable{' '}
+              <strong>Server Members Intent</strong>. This is required for Lorekeeper to know who's in
+              your voice channels.
+            </li>
+            <li>
+              Open the <strong>OAuth2</strong> tab, then <strong>URL Generator</strong>. Under Scopes,
+              check <strong>bot</strong> and <strong>applications.commands</strong>. Under Bot Permissions,
+              check <strong>View Channels</strong>, <strong>Connect</strong>, and <strong>Speak</strong>.
+            </li>
+            <li>
+              Copy the generated URL at the bottom of that page, open it in your browser, pick your
+              server, and click <strong>Authorize</strong>. The bot will now appear in your server
+              (offline until you paste its token here and save).
+            </li>
+          </ol>
+        )}
       </div>
 
       <div>
@@ -210,23 +266,120 @@ export function SettingsPanel({ token }: { token: string }) {
         )}
       </div>
 
+      <div className="rounded-md border border-slate-700 bg-slate-900 p-3">
+        <h4 className="mb-1 text-sm font-semibold text-slate-200">Transcription</h4>
+        <p className="mb-2 text-xs text-slate-400">
+          Turns recorded voice into text. The OpenAI Whisper API costs a small amount per minute of
+          audio; the local option is completely free and keeps audio on this machine, at the cost of
+          slower processing and slightly lower accuracy.
+        </p>
+        <div className="mb-2 flex gap-4 text-sm text-slate-300">
+          <label className="flex items-center gap-1.5">
+            <input
+              type="radio"
+              checked={transcriptionProvider === 'openai'}
+              onChange={() => setTranscriptionProvider('openai')}
+            />
+            OpenAI Whisper API (paid)
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="radio"
+              checked={transcriptionProvider === 'local'}
+              onChange={() => setTranscriptionProvider('local')}
+            />
+            Local Whisper (free)
+          </label>
+        </div>
+        {transcriptionProvider === 'openai' ? (
+          <div>
+            <label className="mb-1 block text-sm text-slate-400">Whisper model</label>
+            <input
+              value={whisperModel}
+              onChange={(e) => setWhisperModel(e.target.value)}
+              className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100"
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="mb-1 block text-sm text-slate-400">Local model size</label>
+            <select
+              value={localWhisperModelSize}
+              onChange={(e) => setLocalWhisperModelSize(e.target.value)}
+              className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100"
+            >
+              <option value="tiny">Tiny - fastest, lowest accuracy (~75MB download)</option>
+              <option value="base">Base - fast, basic accuracy (~145MB download)</option>
+              <option value="small">Small - balanced, recommended (~480MB download)</option>
+              <option value="medium">Medium - slower, more accurate (~1.5GB download)</option>
+              <option value="large-v3">Large - slowest, most accurate (~3GB download)</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              The model downloads automatically the first time you process a session, then it's cached
+              on disk. No account or setup needed - this runs entirely on this computer.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-md border border-slate-700 bg-slate-900 p-3">
+        <h4 className="mb-1 text-sm font-semibold text-slate-200">Summarization</h4>
+        <p className="mb-2 text-xs text-slate-400">
+          Turns the transcript into GM and player recaps. OpenAI's GPT-4o gives the highest quality
+          summaries but costs money per session; Ollama runs a free open-source model locally instead.
+        </p>
+        <div className="mb-2 flex gap-4 text-sm text-slate-300">
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={llmProvider === 'openai'} onChange={() => setLlmProvider('openai')} />
+            OpenAI (paid)
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={llmProvider === 'ollama'} onChange={() => setLlmProvider('ollama')} />
+            Ollama (free, local)
+          </label>
+        </div>
+        {llmProvider === 'ollama' && (
+          <p className="mb-2 text-xs text-slate-400">
+            Install{' '}
+            <a
+              href="https://ollama.com/download"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-400 underline hover:text-indigo-300"
+            >
+              Ollama
+            </a>
+            , then pull a model from a terminal, e.g. <code className="text-slate-300">ollama pull llama3.1</code>.
+            Ollama must be running in the background for summarization to work.
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm text-slate-400">
+              {llmProvider === 'ollama' ? 'Ollama model name' : 'Summarization model'}
+            </label>
+            <input
+              value={summarizationModel}
+              onChange={(e) => setSummarizationModel(e.target.value)}
+              placeholder={llmProvider === 'ollama' ? 'llama3.1' : 'gpt-4o'}
+              className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+            />
+          </div>
+          {llmProvider === 'ollama' && (
+            <div>
+              <label className="mb-1 block text-sm text-slate-400">Ollama URL</label>
+              <input
+                value={ollamaBaseUrl}
+                onChange={(e) => setOllamaBaseUrl(e.target.value)}
+                placeholder="http://localhost:11434/v1"
+                className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-sm text-slate-400">Whisper model</label>
-          <input
-            value={whisperModel}
-            onChange={(e) => setWhisperModel(e.target.value)}
-            className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-slate-400">Summarization model</label>
-          <input
-            value={summarizationModel}
-            onChange={(e) => setSummarizationModel(e.target.value)}
-            className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100"
-          />
-        </div>
         <div>
           <label className="mb-1 block text-sm text-slate-400">Recording chunk (minutes)</label>
           <input

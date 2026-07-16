@@ -15,7 +15,22 @@ import logging
 
 from openai import OpenAI
 
+from app.config import Settings
+from app.runtime_config import RuntimeConfigStore
+
 logger = logging.getLogger(__name__)
+
+
+def build_llm_client(settings: "Settings | RuntimeConfigStore") -> OpenAI:
+    """Builds the chat-completions client for whichever provider the GM has
+    selected. Ollama exposes an OpenAI-compatible /v1 endpoint, so this is
+    the *only* place provider-switching needs to happen - everything else
+    calling _chat()/generate_*_summary() is unaware of which provider is in
+    use. The api_key sent to Ollama is a placeholder; Ollama does not check it.
+    """
+    if settings.llm_provider == "ollama":
+        return OpenAI(api_key="ollama", base_url=settings.ollama_base_url)
+    return OpenAI(api_key=settings.openai_api_key)
 
 _GM_SYSTEM_PROMPT = """\
 You are an assistant summarizing a Dungeons & Dragons session transcript for \
