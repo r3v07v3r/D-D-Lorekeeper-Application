@@ -4,6 +4,15 @@
 # same as the manual process this replaces (see README). Pushes that don't
 # bump it (docs, CI tweaks, etc.) are a fast no-op instead of failing on a
 # duplicate release.
+#
+# electron/package.json's build.publish.releaseType is deliberately set to
+# "release" (electron-builder's default is "draft"). A draft doesn't create
+# a real git tag until someone manually publishes it, which would silently
+# break both this dedup check (next push wouldn't see the version as
+# released and would rebuild/republish it) and the app's auto-updater
+# (which only looks at the latest *published* release) - learned the hard
+# way when the first real run of this workflow left v1.2.0 sitting
+# unpublished with no tag.
 name: Build and release
 
 on:
