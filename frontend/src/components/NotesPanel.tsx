@@ -6,7 +6,7 @@ interface Props {
   token: string
   sessionId: number
   role: Role
-  players: UserPublic[] // only used to populate the GM's "target player" picker
+  players: UserPublic[] // used for the GM's "target player" picker and to label tagged notes
 }
 
 export function NotesPanel({ token, sessionId, role, players }: Props) {
@@ -17,6 +17,10 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
   const [targetPlayerId, setTargetPlayerId] = useState<number | ''>('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function playerName(userId: number): string | undefined {
+    return players.find((p) => p.id === userId)?.username
+  }
 
   useEffect(() => {
     refresh()
@@ -76,10 +80,17 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
                   : 'border-slate-800 bg-slate-900 text-slate-200'
               }`}
             >
-              {note.is_private_gm && (
+              {note.is_private_gm ? (
                 <div className="mb-1 text-xs uppercase tracking-wide text-amber-400">
                   Secret{note.target_player_id ? ' - shared with one player' : ' - GM only'}
                 </div>
+              ) : (
+                note.target_player_id &&
+                playerName(note.target_player_id) && (
+                  <div className="mb-1 text-xs uppercase tracking-wide text-slate-500">
+                    About {playerName(note.target_player_id)}
+                  </div>
+                )
               )}
               {note.content}
             </li>
@@ -101,20 +112,22 @@ export function NotesPanel({ token, sessionId, role, players }: Props) {
               <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
               Secret (GM only)
             </label>
-            {isPrivate && (
-              <select
-                value={targetPlayerId}
-                onChange={(e) => setTargetPlayerId(e.target.value ? Number(e.target.value) : '')}
-                className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100"
-              >
-                <option value="">GM only (no target player)</option>
-                {players.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    Share with {p.username}
-                  </option>
-                ))}
-              </select>
-            )}
+            {/* Meaningful either way (Model B): when Secret, this scopes who
+                can see it; when public, it's just an informational tag for
+                who the note is about - so it must not be hidden behind the
+                Secret checkbox. */}
+            <select
+              value={targetPlayerId}
+              onChange={(e) => setTargetPlayerId(e.target.value ? Number(e.target.value) : '')}
+              className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100"
+            >
+              <option value="">{isPrivate ? 'GM only (no target player)' : 'Not about a specific player'}</option>
+              {players.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {isPrivate ? `Share with ${p.username}` : `About ${p.username}`}
+                </option>
+              ))}
+            </select>
           </div>
         )}
         <button

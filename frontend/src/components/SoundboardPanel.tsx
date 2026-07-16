@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { deleteSoundClip, listSoundClips, playSoundClip, stopSoundClip, updateSoundClip, uploadSoundClip } from '../api/resources'
-import type { SoundClipPublic } from '../types/api'
+import {
+  deleteSoundClip,
+  getBotStatus,
+  listSoundClips,
+  playSoundClip,
+  stopSoundClip,
+  updateSoundClip,
+  uploadSoundClip,
+} from '../api/resources'
+import type { BotStatusResponse, SoundClipPublic } from '../types/api'
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,6 +26,7 @@ function fileToBase64(file: File): Promise<string> {
 
 export function SoundboardPanel({ token }: { token: string }) {
   const [clips, setClips] = useState<SoundClipPublic[]>([])
+  const [botStatus, setBotStatus] = useState<BotStatusResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [busyClipId, setBusyClipId] = useState<number | null>(null)
@@ -26,6 +35,13 @@ export function SoundboardPanel({ token }: { token: string }) {
 
   useEffect(() => {
     refresh()
+    refreshBotStatus()
+    // "Connected" here means the bot itself has joined a channel (from Bot
+    // Control) - not whether you personally are in one - so this needs to
+    // stay live rather than a one-time check, since it's easy to change
+    // from the other tab and forget.
+    const interval = setInterval(refreshBotStatus, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   async function refresh() {
@@ -34,6 +50,15 @@ export function SoundboardPanel({ token }: { token: string }) {
       setError(null)
     } catch {
       setError('Could not load soundboard clips.')
+    }
+  }
+
+  async function refreshBotStatus() {
+    try {
+      setBotStatus(await getBotStatus(token))
+    } catch {
+      // Bot Control tab already surfaces connection errors - avoid a
+      // redundant/competing error message here.
     }
   }
 
@@ -113,9 +138,16 @@ export function SoundboardPanel({ token }: { token: string }) {
         </button>
       </div>
       <p className="text-xs text-slate-500">
-        Sounds play into the connected Discord voice channel via the bot - join a channel in Bot Control
-        first. Supported formats: mp3, wav, ogg, m4a, flac (max 8MB each).
+        Sounds play into the Discord voice channel through the bot. Supported formats: mp3, wav, ogg,
+        m4a, flac (max 8MB each).
       </p>
+
+      {botStatus && !botStatus.connected && (
+        <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
+          The <strong>bot</strong> hasn't joined a voice channel yet - being in the channel yourself
+          isn't enough, the bot needs to join too. Go to <strong>Bot Control</strong> and click Join.
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
@@ -154,7 +186,8 @@ export function SoundboardPanel({ token }: { token: string }) {
               </div>
               <button
                 onClick={() => handlePlay(clip.id)}
-                disabled={busyClipId === clip.id}
+                disabled={busyClipId === clip.id || !botStatus?.connected}
+                title={botStatus?.connected ? undefined : 'The bot needs to join a voice channel first (Bot Control tab)'}
                 className="mb-2 w-full rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
               >
                 {busyClipId === clip.id ? 'Playing...' : 'Play'}

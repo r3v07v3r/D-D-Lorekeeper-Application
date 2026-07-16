@@ -27,6 +27,12 @@ async def fetch_character_raw(character_id: str) -> dict:
     except httpx.HTTPError as exc:
         raise DndBeyondError(f"Could not reach D&D Beyond: {exc}") from exc
 
+    if response.status_code == 403:
+        raise DndBeyondError(
+            f"D&D Beyond rejected the request for character {character_id} (403 Unauthorized). "
+            f"This almost always means the character's sharing setting isn't 'Public' - on the "
+            f"character sheet, open the cog/settings menu and set visibility to Public, then sync again."
+        )
     if response.status_code != 200:
         raise DndBeyondError(f"D&D Beyond returned HTTP {response.status_code} for character {character_id}")
 
