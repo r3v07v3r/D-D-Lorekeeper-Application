@@ -209,12 +209,18 @@ automatically at app startup, including inside the packaged build.
 ### Releasing
 
 Releases are built and published automatically by
-[`.github/workflows/release.yml`](.github/workflows/release.yml): every push to `main`
-checks whether `electron/package.json`'s `version` already has a matching GitHub release,
-and if not, runs the backend tests, builds the backend exe + frontend + installer, and
-publishes a new release with the installer, `latest.yml`, and `.blockmap` attached (what
-the app's auto-updater reads). **Bumping that version is what triggers a release** -
-pushes that don't touch it (docs, CI tweaks, etc.) are a no-op.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) - **every merge to `main`
+gets its own released version**, no manual version bump required. On each push, the
+workflow checks whether `electron/package.json`'s committed version already has a matching
+GitHub release; if it does, it bumps the version (patch by default), pushes that bump, and
+the resulting push triggers the real build: backend tests, backend exe + frontend +
+installer, then a published release with the installer, `latest.yml`, and `.blockmap`
+attached (what the app's auto-updater reads).
+
+The bump defaults to patch. To bump minor or major instead, include `[minor]` or `[major]`
+anywhere in the merge commit message - for a PR merged with `gh pr merge --merge` (or the
+GitHub UI's "Create a merge commit"), that's the PR title, so e.g. titling a PR
+`Add spellcasting [minor]` bumps the minor version instead of the patch version.
 
 To build a release locally instead (e.g. to test packaging changes before pushing):
 
