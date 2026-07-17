@@ -65,7 +65,7 @@ export function PlayerDashboard() {
   const selected = sessions.find((s) => s.id === selectedId) ?? null
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-1 flex-col space-y-3">
       <div className="flex items-center justify-between">
         {campaign && (
           <h2 className="text-sm font-medium text-[var(--text-muted)]">
@@ -77,7 +77,7 @@ export function PlayerDashboard() {
         </span>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-1 gap-4">
         <Sidebar navItems={NAV_ITEMS} active={tab} onSelect={(key) => setTab(key as Tab)} />
 
         <div className="min-w-0 flex-1 space-y-4">

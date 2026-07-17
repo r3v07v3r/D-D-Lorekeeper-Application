@@ -267,7 +267,7 @@ export function GMDashboard() {
   )
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-1 flex-col space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-[var(--text-muted)]">
           Campaign: <span className="text-[var(--text)]">{activeCampaign.name}</span>
@@ -281,7 +281,7 @@ export function GMDashboard() {
         </button>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-1 gap-4">
         <Sidebar navItems={navItems} active={tab} onSelect={(key) => setTab(key as Tab)} footer={partyFooter || undefined} />
 
         <div className="min-w-0 flex-1 space-y-4">
