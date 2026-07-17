@@ -26,7 +26,7 @@ const fs = require('node:fs')
 const https = require('node:https')
 const http = require('node:http')
 const crypto = require('node:crypto')
-const { spawn, execFile } = require('node:child_process')
+const { spawn, execFile, execFileSync } = require('node:child_process')
 
 const BACKEND_PORT = 8000
 const LOCAL_BACKEND_URL = `https://127.0.0.1:${BACKEND_PORT}`
@@ -35,6 +35,33 @@ let backendProcess = null
 let mainWindow = null
 let botPanelWindow = null // detached Bot Control + Soundboard window - see openBotPanelWindow()
 let upnpGateway = null // set if a router mapping succeeds - unmapped on quit
+
+// Prevents two copies of this app running at once. Without this, each launch
+// spawns its own backend process (see startBackend below), and two backends
+// both binding BACKEND_PORT and writing the same SQLite file collide badly -
+// a real incident: a second launch (e.g. double-clicking the shortcut again,
+// or reopening right after the auto-updater's quitAndInstall relaunch) left
+// two backend processes alive at once, and a write from one lost to SQLite
+// file-lock contention with the other, surfacing in the renderer as an
+// unrelated-looking "could not create that campaign" API error with no
+// indication two backends were even involved. If this isn't the first
+// instance, quit immediately - before spawning anything at all. (A bare
+// top-level `return` is valid here: Node wraps every CommonJS module's body
+// in a function, so this just stops the rest of this file from running.)
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+  return
+}
+
+app.on('second-instance', () => {
+  // Someone tried to launch a second copy - bring the existing window
+  // forward instead of silently doing nothing (or, before this fix, quietly
+  // spawning a second backend).
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
 
 // hostKey ("host:port") -> expected certificate SHA-256 fingerprint, colon-
 // hex uppercase (Node's tls.TLSSocket#getPeerCertificate().fingerprint256
@@ -60,11 +87,28 @@ function backendConfigDir() {
   return app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'backend')
 }
 
+// Belt-and-suspenders alongside the single-instance lock above: that lock
+// stops two *main* processes coexisting, but a backend can still be
+// orphaned if the main process that spawned it dies abnormally (forced
+// termination, an update installer killing it directly, a genuine crash) -
+// none of that runs the will-quit handler that would normally kill it.
+// Best-effort and silent on failure (the common case: nothing to clean up).
+function killOrphanedBackendProcess() {
+  if (process.platform !== 'win32') return
+  try {
+    execFileSync('taskkill', ['/F', '/IM', 'lorekeeper-backend.exe'], { stdio: 'ignore' })
+    console.log('[backend] cleaned up an orphaned backend process from a previous run')
+  } catch {
+    // Nothing matched, or taskkill unavailable - nothing to clean up.
+  }
+}
+
 function startBackend() {
   const configDir = backendConfigDir()
   fs.mkdirSync(configDir, { recursive: true })
 
   if (app.isPackaged) {
+    killOrphanedBackendProcess()
     backendProcess = spawn(backendExecutablePath(), [], {
       env: {
         ...process.env,
